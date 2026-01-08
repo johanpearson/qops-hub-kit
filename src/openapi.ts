@@ -117,31 +117,6 @@ export class OpenApiBuilder {
         }
       : undefined;
 
-    const parameters: any[] = [];
-
-    if (route.queryParams) {
-      const queryShape = route.queryParams.shape;
-      for (const [name, schema] of Object.entries(queryShape)) {
-        parameters.push({
-          name,
-          in: 'query',
-          schema: schema as z.ZodTypeAny,
-        });
-      }
-    }
-
-    if (route.pathParams) {
-      const pathShape = route.pathParams.shape;
-      for (const [name, schema] of Object.entries(pathShape)) {
-        parameters.push({
-          name,
-          in: 'path',
-          required: true,
-          schema: schema as z.ZodTypeAny,
-        });
-      }
-    }
-
     const responses: any = {};
     for (const [statusCode, response] of Object.entries(route.responses)) {
       responses[statusCode] = {
@@ -156,14 +131,24 @@ export class OpenApiBuilder {
       };
     }
 
+    const requestConfig: any = {};
+    if (requestBody) {
+      requestConfig.body = requestBody;
+    }
+    if (route.queryParams) {
+      requestConfig.query = route.queryParams;
+    }
+    if (route.pathParams) {
+      requestConfig.params = route.pathParams;
+    }
+
     this.registry.registerPath({
       method: route.method.toLowerCase() as any,
       path: route.path,
       summary: route.summary,
       description: route.description,
       tags: route.tags,
-      ...(requestBody && { request: { body: requestBody } }),
-      ...(parameters.length > 0 && { request: { params: z.object({}) } }),
+      ...(Object.keys(requestConfig).length > 0 && { request: requestConfig }),
       responses,
       ...(route.requiresAuth && {
         security: [{ bearerAuth: [] }],

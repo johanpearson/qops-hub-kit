@@ -235,7 +235,15 @@ export function createHandler(
 
       // 3. Request validation
       if (config.bodySchema) {
-        const body = await request.json().catch(() => ({}));
+        let body;
+        try {
+          body = await request.json();
+        } catch (error) {
+          throw new AppError(
+            ErrorCode.BAD_REQUEST,
+            'Invalid JSON in request body'
+          );
+        }
         parsedData.body = config.bodySchema.parse(body);
       }
 

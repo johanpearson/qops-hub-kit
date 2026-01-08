@@ -4,11 +4,21 @@
   "description": "A utility package for creating Azure Function v4 APIs with TypeScript - featuring OpenAPI docs, JWT auth, error handling, and correlation IDs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
     "prepare": "npm run build",
     "test": "echo \"No tests yet\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johanpearson/qops-hub-kit.git"
   },
   "keywords": [
     "azure",
@@ -17,10 +27,18 @@
     "openapi",
     "jwt",
     "middleware",
-    "api"
+    "api",
+    "correlation-id",
+    "error-handling",
+    "validation",
+    "zod"
   ],
   "author": "Johan Pearson",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/johanpearson/qops-hub-kit/issues"
+  },
+  "homepage": "https://github.com/johanpearson/qops-hub-kit#readme",
   "private": true,
   "dependencies": {
     "@azure/functions": "^4.0.0",

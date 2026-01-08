@@ -1,4 +1,4 @@
-import { createHandler, AppError, ErrorCode, UserRole, z } from '@qops/hub-kit';
+import { createHandler, UserRole, z } from '@qops/hub-kit';
 import jwt from 'jsonwebtoken';
 import { authenticateUser, getUserById, listUsers } from './services/user.service.js';
 

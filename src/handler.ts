@@ -38,6 +38,10 @@ export interface HandlerConfig {
    * Enable request/response logging
    */
   enableLogging?: boolean;
+  /**
+   * Skip body parsing (useful for file uploads or custom parsing)
+   */
+  skipBodyParsing?: boolean;
 }
 
 /**
@@ -201,7 +205,7 @@ export function createHandler(
       }
 
       // 3. Request validation
-      if (config.bodySchema) {
+      if (config.bodySchema && !config.skipBodyParsing) {
         let body;
         try {
           body = await request.json();

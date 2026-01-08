@@ -262,6 +262,7 @@ Creates an Azure Function handler with built-in middleware.
   - `algorithms`: Allowed algorithms (default: `['HS256']`)
 - `requiredRoles`: Array of required roles (`UserRole.MEMBER` | `UserRole.ADMIN`)
 - `enableLogging`: Enable request/response logging
+- `skipBodyParsing`: Skip automatic JSON parsing (useful for file uploads)
 
 **Handler receives:**
 
@@ -272,6 +273,103 @@ Creates an Azure Function handler with built-in middleware.
   - `query`: Validated query parameters
   - `user`: Authenticated user (contains `sub`, `email`, `name`, `role`)
   - `correlationId`: Request correlation ID
+
+### File Uploads
+
+Handle file uploads by skipping automatic body parsing:
+
+```typescript
+import { createHandler, UserRole } from '@qops/hub-kit';
+
+export default createHandler(
+  async (request, _context, { user }) => {
+    const contentType = request.headers.get('content-type') || 'application/octet-stream';
+
+    if (contentType.includes('application/json')) {
+      // Handle JSON with base64-encoded file
+      const body = await request.json();
+      const fileBuffer = Buffer.from(body.fileData, 'base64');
+      // Upload to storage...
+    } else {
+      // Handle raw binary upload
+      const arrayBuffer = await request.arrayBuffer();
+      const fileBuffer = Buffer.from(arrayBuffer);
+      // Upload to storage...
+    }
+
+    return { status: 201, jsonBody: { message: 'File uploaded' } };
+  },
+  {
+    jwtConfig: { secret: process.env.JWT_SECRET! },
+    requiredRoles: [UserRole.MEMBER],
+    skipBodyParsing: true, // Important for file uploads
+  },
+);
+```
+
+### Database Integration
+
+The package works seamlessly with any database. Keep database logic in the service layer:
+
+**PostgreSQL Example:**
+
+```typescript
+// services/database.ts
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
+export async function getUserFromDb(id: string) {
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+  return result.rows[0];
+}
+```
+
+**Azure Cosmos DB Example:**
+
+```typescript
+// services/database.ts
+import { CosmosClient } from '@azure/cosmos';
+
+const client = new CosmosClient({
+  endpoint: process.env.COSMOS_ENDPOINT!,
+  key: process.env.COSMOS_KEY!,
+});
+
+const container = client.database('mydb').container('users');
+
+export async function getUserFromCosmos(id: string) {
+  const { resource } = await container.item(id, id).read();
+  return resource;
+}
+```
+
+See `example/src/services/database.example.ts` for more examples (MongoDB, Azure SQL, MySQL).
+
+### Blob Storage Integration
+
+**Azure Blob Storage Example:**
+
+```typescript
+// services/storage.ts
+import { BlobServiceClient } from '@azure/storage-blob';
+
+const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING!);
+const containerClient = blobServiceClient.getContainerClient('uploads');
+
+export async function uploadToBlob(fileBuffer: Buffer, fileName: string) {
+  const blobClient = containerClient.getBlockBlobClient(fileName);
+  await blobClient.upload(fileBuffer, fileBuffer.length);
+  return blobClient.url;
+}
+```
+
+See `example/src/services/blob-storage.example.ts` for complete integration examples.
 
 ### Error Handling
 
@@ -344,4 +442,3 @@ Husky runs automatically on commit to:
 - Format all staged files with Prettier
 - Fix linting issues with ESLint
 - Ensure code quality before commit
-

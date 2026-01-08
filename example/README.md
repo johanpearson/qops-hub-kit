@@ -7,6 +7,11 @@ This is a complete working example demonstrating the `@qops/hub-kit` package in 
 ✅ **Login endpoint** - Unauthenticated endpoint with request validation  
 ✅ **Get user by ID** - Protected endpoint requiring JWT authentication  
 ✅ **List all users** - Protected endpoint with role-based access control  
+✅ **File upload** - Multipart file upload with storage simulation  
+✅ **File download** - Secure file download with access control  
+✅ **List files** - List uploaded files with user filtering  
+✅ **Database integration** - Examples for various databases (Cosmos DB, SQL, PostgreSQL, MongoDB)  
+✅ **Blob storage integration** - Azure Blob Storage integration examples  
 ✅ **Pre-seeded users** - Admin and member users for testing  
 ✅ **Integration tests** - Automated tests validating all functionality
 
@@ -16,17 +21,23 @@ This is a complete working example demonstrating the `@qops/hub-kit` package in 
 example/
 ├── src/
 │   ├── services/
-│   │   └── user.service.ts         # Business logic
+│   │   ├── user.service.ts            # User business logic
+│   │   ├── file.service.ts            # File upload/download logic
+│   │   ├── database.example.ts        # Database integration examples
+│   │   └── blob-storage.example.ts    # Blob storage integration examples
 │   ├── functions/
-│   │   ├── login.ts                 # POST /api/auth/login
-│   │   ├── get-user.ts              # GET /api/users/{id}
-│   │   └── list-users.ts            # GET /api/users
-│   ├── index.ts                     # Function registration
-│   └── test-integration.ts          # Integration tests
+│   │   ├── login.ts                   # POST /api/auth/login
+│   │   ├── get-user.ts                # GET /api/users/{id}
+│   │   ├── list-users.ts              # GET /api/users
+│   │   ├── upload-file.ts             # POST /api/files/upload
+│   │   ├── download-file.ts           # GET /api/files/{id}
+│   │   └── list-files.ts              # GET /api/files
+│   ├── index.ts                       # Function registration
+│   └── test-integration.ts            # Integration tests
 ├── package.json
 ├── tsconfig.json
-├── host.json                        # Azure Functions configuration
-└── local.settings.json              # Local environment variables
+├── host.json                          # Azure Functions configuration
+└── local.settings.json                # Local environment variables
 ```
 
 ## Setup
@@ -82,6 +93,21 @@ curl http://localhost:7071/api/users/<user-id> \
 # List users
 curl http://localhost:7071/api/users \
   -H "Authorization: Bearer $TOKEN"
+
+# Upload a file (JSON with base64)
+curl -X POST http://localhost:7071/api/files/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"fileName":"test.txt","fileData":"SGVsbG8gV29ybGQh","mimeType":"text/plain"}'
+
+# List files
+curl http://localhost:7071/api/files \
+  -H "Authorization: Bearer $TOKEN"
+
+# Download a file
+curl http://localhost:7071/api/files/<file-id> \
+  -H "Authorization: Bearer $TOKEN" \
+  -o downloaded-file.txt
 ```
 
 ## Pre-seeded Users
@@ -157,6 +183,54 @@ The package provides consistent error handling:
 throw new AppError(ErrorCode.NOT_FOUND, 'User not found');
 // Automatically returns: { status: 404, jsonBody: { error: { ... } } }
 ```
+
+### 5. File Uploads
+
+The package supports file uploads with flexible parsing:
+
+```typescript
+const uploadHandler = createHandler(
+  async (request, _context, { user }) => {
+    // Handle JSON with base64-encoded file
+    const body = await request.json();
+    const fileBuffer = Buffer.from(body.fileData, 'base64');
+
+    // Upload to storage and save metadata
+    const file = await uploadFile(fileBuffer, body.fileName, body.mimeType, user!.sub);
+
+    return { status: 201, jsonBody: file };
+  },
+  {
+    jwtConfig: { secret: process.env.JWT_SECRET },
+    requiredRoles: [UserRole.MEMBER],
+    skipBodyParsing: true, // Important for file uploads
+  },
+);
+```
+
+### 6. Database Integration
+
+The package works seamlessly with any database. Examples provided for:
+
+- **Azure Cosmos DB** - NoSQL database
+- **Azure SQL Database** - Relational database
+- **PostgreSQL** - Open-source relational database
+- **MongoDB** - Document database
+- **MySQL** - Relational database
+
+See `services/database.example.ts` for complete examples.
+
+### 7. Blob Storage Integration
+
+Azure Blob Storage integration example shows how to:
+
+- Upload files to blob storage
+- Download files from blob storage
+- Generate SAS URLs for temporary access
+- List blobs in a container
+- Delete blobs
+
+See `services/blob-storage.example.ts` for complete examples.
 
 ## Integration Test Results
 

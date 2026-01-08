@@ -298,3 +298,50 @@ throw createNotFoundError('User not found');
 ## License
 
 MIT
+
+## Development
+
+### Testing
+
+Run tests:
+
+```bash
+npm test
+```
+
+Run tests with coverage:
+
+```bash
+npm run test:coverage
+```
+
+Coverage requirements: 80% for lines, functions, branches, and statements.
+
+### Linting & Formatting
+
+Format code:
+
+```bash
+npm run format
+```
+
+Lint code:
+
+```bash
+npm run lint
+```
+
+Auto-fix linting issues:
+
+```bash
+npm run lint:fix
+```
+
+### Pre-commit Hooks
+
+Husky runs automatically on commit to:
+
+- Format all staged files with Prettier
+- Fix linting issues with ESLint
+- Ensure code quality before commit
+

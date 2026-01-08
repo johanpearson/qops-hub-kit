@@ -6,7 +6,21 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
+      exclude: [
+        'node_modules/**',
+        'dist/**',
+        'example/**',
+        '**/*.test.ts',
+        '**/*.config.ts',
+        '**/*.config.js',
+      ],
+      include: ['src/**/*.ts'],
+      all: true,
+      lines: 80,
+      functions: 80,
+      branches: 80,
+      statements: 80,
     },
   },
 });

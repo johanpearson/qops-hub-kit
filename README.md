@@ -333,6 +333,46 @@ That's it! You now have a working Azure Functions API with authentication, valid
 
 ---
 
+## Configuring Base URL and Route Prefix
+
+The base URL for Azure Functions is controlled by the Azure Functions runtime, not by this package.
+
+### Local Development
+
+- **Default**: `http://localhost:7071/api/{function-name}`
+- **Port**: Configure in `local.settings.json` via `Host.LocalHttpPort` (defaults to 7071)
+- **Route Prefix**: The `/api` prefix is set in `host.json`
+
+### Azure (Production)
+
+- **Default**: `https://{function-app-name}.azurewebsites.net/api/{function-name}`
+- **Custom Domains**: Configure in Azure Portal under Custom domains
+
+### Customizing the Route Prefix
+
+To change the `/api` prefix (or remove it entirely), add this to your `host.json`:
+
+```json
+{
+  "version": "2.0",
+  "extensions": {
+    "http": {
+      "routePrefix": "v1"  // Changes /api to /v1
+      // or use "" to remove the prefix entirely
+    }
+  }
+}
+```
+
+**Examples:**
+- `"routePrefix": "v1"` → `http://localhost:7071/v1/auth/login`
+- `"routePrefix": ""` → `http://localhost:7071/auth/login`
+- `"routePrefix": "api/v2"` → `http://localhost:7071/api/v2/auth/login`
+
+The function route paths (e.g., `auth/login`, `users/{id}`) are defined when you register handlers in your function configuration using the `route` property.
+
+---
+
 ## Installation
 
 ```bash

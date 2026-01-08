@@ -131,18 +131,6 @@ stages:
               versionSpec: '$(nodeVersion)'
 
           - task: Npm@1
-            displayName: 'Authenticate with Azure Artifacts'
-            inputs:
-              command: 'custom'
-              customCommand: 'config set registry https://pkgs.dev.azure.com/$(System.TeamFoundationCollectionUri)/_packaging/$(artifactFeedName)/npm/registry/'
-              workingDir: '$(System.ArtifactsDirectory)/package'
-
-          - task: npmAuthenticate@0
-            displayName: 'npm Authenticate'
-            inputs:
-              workingFile: '$(System.ArtifactsDirectory)/package/.npmrc'
-
-          - task: Npm@1
             displayName: 'Publish package to Azure Artifacts'
             inputs:
               command: 'publish'

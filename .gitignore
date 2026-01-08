@@ -6,9 +6,6 @@ dist/
 *.tsbuildinfo
 coverage/
 .eslintcache
-test-project/node_modules/
-test-project/dist/
-test-project/package-lock.json
 example/node_modules/
 example/dist/
 example/package-lock.json

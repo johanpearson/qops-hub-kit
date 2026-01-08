@@ -10,16 +10,13 @@ import { UserRole } from './auth';
 export type RouteHandler<TBody = any, TQuery = any> = (
   request: HttpRequest,
   context: InvocationContext,
-  data: ParsedRequest & { body: TBody; query: TQuery }
+  data: ParsedRequest & { body: TBody; query: TQuery },
 ) => Promise<HttpResponseInit>;
 
 /**
  * Service function type - pure business logic
  */
-export type ServiceFunction<TInput, TOutput> = (
-  input: TInput,
-  userId?: string
-) => Promise<TOutput> | TOutput;
+export type ServiceFunction<TInput, TOutput> = (input: TInput, userId?: string) => Promise<TOutput> | TOutput;
 
 /**
  * Route configuration with schema and handler
@@ -84,7 +81,7 @@ export class RouteBuilder {
 
   /**
    * Create a route builder
-   * 
+   *
    * @param openApiBuilder - Optional OpenAPI builder for automatic documentation
    */
   constructor(openApiBuilder?: OpenApiBuilder) {
@@ -93,14 +90,14 @@ export class RouteBuilder {
 
   /**
    * Define a route with schema and handler
-   * 
+   *
    * @param route - Route configuration
    * @returns The route builder for chaining
-   * 
+   *
    * @example
    * ```typescript
    * const builder = new RouteBuilder(openApiBuilder);
-   * 
+   *
    * builder.route({
    *   method: 'POST',
    *   path: '/api/users',
@@ -130,7 +127,7 @@ export class RouteBuilder {
 
   /**
    * Get a route by method and path
-   * 
+   *
    * @param method - HTTP method
    * @param path - Route path
    * @returns The route or undefined
@@ -141,7 +138,7 @@ export class RouteBuilder {
 
   /**
    * Get all routes
-   * 
+   *
    * @returns Array of all routes
    */
   getAllRoutes(): Route[] {
@@ -150,13 +147,11 @@ export class RouteBuilder {
 
   /**
    * Create an Azure Function handler from a route
-   * 
+   *
    * @param route - Route configuration
    * @returns Azure Function handler
    */
-  createAzureHandler<TBody = any, TQuery = any>(
-    route: Route<TBody, TQuery>
-  ) {
+  createAzureHandler<TBody = any, TQuery = any>(route: Route<TBody, TQuery>) {
     const config: HandlerConfig = {
       bodySchema: route.bodySchema,
       querySchema: route.querySchema,
@@ -227,11 +222,11 @@ export class RouteBuilder {
 
 /**
  * Helper to create a simple route handler from a service function
- * 
+ *
  * @param serviceFn - Service function
  * @param options - Options for the handler
  * @returns Route handler
- * 
+ *
  * @example
  * ```typescript
  * builder.route({
@@ -250,12 +245,12 @@ export function createRouteHandler<TInput, TOutput>(
   options: {
     successStatus?: number;
     passUser?: boolean;
-  } = {}
+  } = {},
 ): RouteHandler<TInput, any> {
   return async (request, context, { body, user }) => {
     const userId = options.passUser ? user?.sub : undefined;
     const result = await serviceFn(body, userId);
-    
+
     return {
       status: options.successStatus || 200,
       jsonBody: result,

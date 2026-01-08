@@ -1,33 +1,18 @@
-import {
-  HttpRequest,
-  HttpResponseInit,
-  InvocationContext,
-} from '@azure/functions';
+import { HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import { AppError, ErrorCode, ErrorStatusMap } from './errors';
+import { AppError, ErrorCode } from './errors';
 import {
   getOrCreateCorrelationId,
   addCorrelationIdToContext,
   getCorrelationId,
   CORRELATION_ID_HEADER,
 } from './correlation';
-import {
-  extractBearerToken,
-  verifyToken,
-  verifyRole,
-  setAuthUser,
-  JwtConfig,
-  UserRole,
-  JwtPayload,
-} from './auth';
+import { extractBearerToken, verifyToken, verifyRole, setAuthUser, JwtConfig, UserRole, JwtPayload } from './auth';
 
 /**
  * Handler function type
  */
-export type HandlerFunction = (
-  request: HttpRequest,
-  context: InvocationContext
-) => Promise<HttpResponseInit>;
+export type HandlerFunction = (request: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>;
 
 /**
  * Handler configuration
@@ -79,15 +64,12 @@ export interface ParsedRequest {
 
 /**
  * Create a response with correlation ID header
- * 
+ *
  * @param context - The invocation context
  * @param response - The response object
  * @returns Response with correlation ID header
  */
-function addCorrelationHeader(
-  context: InvocationContext,
-  response: HttpResponseInit
-): HttpResponseInit {
+function addCorrelationHeader(context: InvocationContext, response: HttpResponseInit): HttpResponseInit {
   const correlationId = getCorrelationId(context);
   if (!correlationId) {
     return response;
@@ -104,15 +86,12 @@ function addCorrelationHeader(
 
 /**
  * Handle errors and convert to HTTP response
- * 
+ *
  * @param error - The error
  * @param context - The invocation context
  * @returns HTTP response
  */
-function handleError(
-  error: unknown,
-  context: InvocationContext
-): HttpResponseInit {
+function handleError(error: unknown, context: InvocationContext): HttpResponseInit {
   const correlationId = getCorrelationId(context);
   context.error(`Error occurred (correlationId: ${correlationId}):`, error);
 
@@ -150,31 +129,31 @@ function handleError(
 
 /**
  * Create an Azure Function handler with built-in middleware
- * 
+ *
  * This wrapper provides:
  * - Correlation ID generation and tracking
  * - JWT verification and role-based authorization
  * - Request validation using Zod schemas
  * - Error handling with consistent error responses
  * - Request/response logging
- * 
+ *
  * @param handler - The handler function
  * @param config - Handler configuration
  * @returns Azure Function handler
- * 
+ *
  * @example
  * ```typescript
  * import { createHandler, z, UserRole } from '@qops/hub-kit';
- * 
+ *
  * const bodySchema = z.object({
  *   name: z.string(),
  *   email: z.string().email(),
  * });
- * 
+ *
  * export default createHandler(
  *   async (request, context) => {
  *     const { body, user } = request.parsedData;
- *     
+ *
  *     return {
  *       status: 200,
  *       jsonBody: { message: 'Success', data: body },
@@ -189,26 +168,17 @@ function handleError(
  * ```
  */
 export function createHandler(
-  handler: (
-    request: HttpRequest,
-    context: InvocationContext,
-    parsedData: ParsedRequest
-  ) => Promise<HttpResponseInit>,
-  config: HandlerConfig = {}
+  handler: (request: HttpRequest, context: InvocationContext, parsedData: ParsedRequest) => Promise<HttpResponseInit>,
+  config: HandlerConfig = {},
 ): HandlerFunction {
-  return async (
-    request: HttpRequest,
-    context: InvocationContext
-  ): Promise<HttpResponseInit> => {
+  return async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
     try {
       // 1. Correlation ID
       const correlationId = getOrCreateCorrelationId(request, context);
       addCorrelationIdToContext(context, correlationId);
 
       if (config.enableLogging) {
-        context.log(
-          `[${correlationId}] ${request.method} ${request.url} - Started`
-        );
+        context.log(`[${correlationId}] ${request.method} ${request.url} - Started`);
       }
 
       const parsedData: ParsedRequest = { correlationId };
@@ -217,10 +187,7 @@ export function createHandler(
       if (config.jwtConfig) {
         const token = extractBearerToken(request);
         if (!token) {
-          throw new AppError(
-            ErrorCode.UNAUTHORIZED,
-            'Missing authorization header'
-          );
+          throw new AppError(ErrorCode.UNAUTHORIZED, 'Missing authorization header');
         }
 
         const user = verifyToken(token, config.jwtConfig);
@@ -238,11 +205,8 @@ export function createHandler(
         let body;
         try {
           body = await request.json();
-        } catch (error) {
-          throw new AppError(
-            ErrorCode.BAD_REQUEST,
-            'Invalid JSON in request body'
-          );
+        } catch (_error) {
+          throw new AppError(ErrorCode.BAD_REQUEST, 'Invalid JSON in request body');
         }
         parsedData.body = config.bodySchema.parse(body);
       }
@@ -259,9 +223,7 @@ export function createHandler(
       const response = await handler(request, context, parsedData);
 
       if (config.enableLogging) {
-        context.log(
-          `[${correlationId}] ${request.method} ${request.url} - Completed ${response.status}`
-        );
+        context.log(`[${correlationId}] ${request.method} ${request.url} - Completed ${response.status}`);
       }
 
       // 5. Add correlation header to response

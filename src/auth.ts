@@ -44,7 +44,7 @@ export interface JwtConfig {
 
 /**
  * Extract Bearer token from Authorization header
- * 
+ *
  * @param request - The HTTP request
  * @returns The token or undefined
  */
@@ -64,7 +64,7 @@ export function extractBearerToken(request: HttpRequest): string | undefined {
 
 /**
  * Verify JWT token and return decoded payload
- * 
+ *
  * @param token - The JWT token
  * @param config - JWT configuration
  * @returns The decoded payload
@@ -92,7 +92,7 @@ export function verifyToken(token: string, config: JwtConfig): JwtPayload {
 
 /**
  * Verify user has required role
- * 
+ *
  * @param payload - The JWT payload
  * @param requiredRoles - Required roles (at least one must match)
  * @throws AppError if user doesn't have required role
@@ -104,9 +104,7 @@ export function verifyRole(payload: JwtPayload, requiredRoles: UserRole[]): void
 
   const hasRole = requiredRoles.some((role) => payload.roles?.includes(role));
   if (!hasRole) {
-    throw createForbiddenError(
-      `Required role not found. Required: ${requiredRoles.join(', ')}`
-    );
+    throw createForbiddenError(`Required role not found. Required: ${requiredRoles.join(', ')}`);
   }
 }
 
@@ -117,7 +115,7 @@ export const AUTH_USER_KEY = 'authUser';
 
 /**
  * Add authenticated user to context
- * 
+ *
  * @param context - The invocation context
  * @param user - The JWT payload
  */
@@ -127,7 +125,7 @@ export function setAuthUser(context: InvocationContext, user: JwtPayload): void 
 
 /**
  * Get authenticated user from context
- * 
+ *
  * @param context - The invocation context
  * @returns The JWT payload or undefined
  */

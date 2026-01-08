@@ -103,7 +103,7 @@ export class OpenApiBuilder {
 
   /**
    * Register a route in the OpenAPI documentation
-   * 
+   *
    * @param route - Route definition
    */
   registerRoute(route: RouteDefinition): void {
@@ -158,7 +158,7 @@ export class OpenApiBuilder {
 
   /**
    * Generate OpenAPI document
-   * 
+   *
    * @returns OpenAPI v3 document
    */
   generateDocument(): any {

@@ -18,7 +18,7 @@ export enum ErrorCode {
 /**
  * Map error codes to HTTP status codes
  */
-export const ErrorStatusMap: Record<ErrorCode, number> = {
+export const ERROR_STATUS_MAP: Record<ErrorCode, number> = {
   [ErrorCode.BAD_REQUEST]: 400,
   [ErrorCode.UNAUTHORIZED]: 401,
   [ErrorCode.FORBIDDEN]: 403,
@@ -35,7 +35,7 @@ export class AppError extends Error {
   constructor(
     public code: ErrorCode,
     message: string,
-    public details?: unknown
+    public details?: unknown,
   ) {
     super(message);
     this.name = 'AppError';
@@ -46,7 +46,7 @@ export class AppError extends Error {
    * Get HTTP status code for this error
    */
   get statusCode(): number {
-    return ErrorStatusMap[this.code];
+    return ERROR_STATUS_MAP[this.code];
   }
 
   /**
@@ -59,11 +59,11 @@ export class AppError extends Error {
         message: this.message,
       },
     };
-    
+
     if (this.details) {
       result.error.details = this.details;
     }
-    
+
     return result;
   }
 }

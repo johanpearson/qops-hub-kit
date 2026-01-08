@@ -340,7 +340,7 @@ Add an OpenAPI endpoint to document your API:
 
 ```typescript
 import { app } from '@azure/functions';
-import { OpenApiBuilder } from '@qops/hub-kit';
+import { OpenApiBuilder, healthCheckResponseSchema } from '@qops/hub-kit';
 import { z } from 'zod';
 
 // Define your schemas
@@ -432,6 +432,22 @@ builder.registerRoute({
     },
   },
   requiresAuth: true,
+});
+
+// Optional: Register health check endpoint
+builder.registerRoute({
+  method: 'GET',
+  path: '/api/health',
+  summary: 'Health check',
+  description: 'Check API health status',
+  tags: ['Health'],
+  responses: {
+    200: {
+      description: 'Service is healthy',
+      schema: healthCheckResponseSchema,
+    },
+  },
+  requiresAuth: false,
 });
 
 // Generate and serve OpenAPI document
@@ -645,6 +661,26 @@ The health check handler:
 - Reports process uptime in seconds
 - Automatically adds correlation ID header
 - Requires no configuration or authentication
+
+**OpenAPI Schema**: Use `healthCheckResponseSchema` to document the health endpoint in your OpenAPI specification:
+
+```typescript
+import { OpenApiBuilder, healthCheckResponseSchema } from '@qops/hub-kit';
+
+builder.registerRoute({
+  method: 'GET',
+  path: '/api/health',
+  summary: 'Health check',
+  tags: ['Health'],
+  responses: {
+    200: {
+      description: 'Service is healthy',
+      schema: healthCheckResponseSchema,
+    },
+  },
+  requiresAuth: false,
+});
+```
 
 ## Handler Options
 

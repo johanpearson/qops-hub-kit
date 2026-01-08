@@ -48,4 +48,4 @@ export {
 export { OpenApiBuilder, OpenApiConfig, RouteDefinition, HttpMethod, z } from './openapi.js';
 
 // Health check
-export { createHealthHandler, HealthCheckResponse } from './health.js';
+export { createHealthHandler, HealthCheckResponse, healthCheckResponseSchema } from './health.js';

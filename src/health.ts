@@ -3,6 +3,7 @@
  */
 
 import { HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { z } from 'zod';
 import { getOrCreateCorrelationId, addCorrelationIdToContext, CORRELATION_ID_HEADER } from './correlation.js';
 
 /**
@@ -13,6 +14,34 @@ export interface HealthCheckResponse {
   timestamp: string;
   uptime: number;
 }
+
+/**
+ * Zod schema for health check response
+ * Use this with OpenApiBuilder to document the health endpoint
+ *
+ * @example
+ * ```typescript
+ * builder.registerRoute({
+ *   method: 'GET',
+ *   path: '/api/health',
+ *   summary: 'Health check',
+ *   description: 'Check API health status',
+ *   tags: ['Health'],
+ *   responses: {
+ *     200: {
+ *       description: 'Service is healthy',
+ *       schema: healthCheckResponseSchema,
+ *     },
+ *   },
+ *   requiresAuth: false,
+ * });
+ * ```
+ */
+export const healthCheckResponseSchema = z.object({
+  status: z.literal('healthy'),
+  timestamp: z.string().describe('ISO 8601 timestamp'),
+  uptime: z.number().describe('Process uptime in seconds'),
+});
 
 /**
  * Create a health check handler

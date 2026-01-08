@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createHealthHandler } from '../src/health';
+import { createHealthHandler, healthCheckResponseSchema } from '../src/health';
 import { HttpRequest, InvocationContext } from '@azure/functions';
 
 describe('health', () => {
@@ -86,6 +86,51 @@ describe('health', () => {
         timestamp: expect.any(String),
         uptime: expect.any(Number),
       });
+    });
+  });
+
+  describe('healthCheckResponseSchema', () => {
+    it('should validate a valid health check response', () => {
+      const validResponse = {
+        status: 'healthy',
+        timestamp: '2024-01-08T19:00:00.000Z',
+        uptime: 123.45,
+      };
+
+      const result = healthCheckResponseSchema.safeParse(validResponse);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid status', () => {
+      const invalidResponse = {
+        status: 'unhealthy',
+        timestamp: '2024-01-08T19:00:00.000Z',
+        uptime: 123.45,
+      };
+
+      const result = healthCheckResponseSchema.safeParse(invalidResponse);
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject missing fields', () => {
+      const invalidResponse = {
+        status: 'healthy',
+        timestamp: '2024-01-08T19:00:00.000Z',
+      };
+
+      const result = healthCheckResponseSchema.safeParse(invalidResponse);
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject invalid types', () => {
+      const invalidResponse = {
+        status: 'healthy',
+        timestamp: '2024-01-08T19:00:00.000Z',
+        uptime: '123.45', // Should be number
+      };
+
+      const result = healthCheckResponseSchema.safeParse(invalidResponse);
+      expect(result.success).toBe(false);
     });
   });
 });

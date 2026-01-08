@@ -7,11 +7,6 @@ This is a complete working example demonstrating the `@qops/hub-kit` package in 
 ✅ **Login endpoint** - Unauthenticated endpoint with request validation  
 ✅ **Get user by ID** - Protected endpoint requiring JWT authentication  
 ✅ **List all users** - Protected endpoint with role-based access control  
-✅ **File upload** - Multipart file upload with storage simulation  
-✅ **File download** - Secure file download with access control  
-✅ **List files** - List uploaded files with user filtering  
-✅ **Database integration** - Examples for various databases (Cosmos DB, SQL, PostgreSQL, MongoDB)  
-✅ **Blob storage integration** - Azure Blob Storage integration examples  
 ✅ **Pre-seeded users** - Admin and member users for testing  
 ✅ **Integration tests** - Automated tests validating all functionality
 
@@ -21,17 +16,11 @@ This is a complete working example demonstrating the `@qops/hub-kit` package in 
 example/
 ├── src/
 │   ├── services/
-│   │   ├── user.service.ts            # User business logic
-│   │   ├── file.service.ts            # File upload/download logic
-│   │   ├── database.example.ts        # Database integration examples
-│   │   └── blob-storage.example.ts    # Blob storage integration examples
+│   │   └── user.service.ts            # User business logic
 │   ├── functions/
 │   │   ├── login.ts                   # POST /api/auth/login
 │   │   ├── get-user.ts                # GET /api/users/{id}
-│   │   ├── list-users.ts              # GET /api/users
-│   │   ├── upload-file.ts             # POST /api/files/upload
-│   │   ├── download-file.ts           # GET /api/files/{id}
-│   │   └── list-files.ts              # GET /api/files
+│   │   └── list-users.ts              # GET /api/users
 │   ├── index.ts                       # Function registration
 │   └── test-integration.ts            # Integration tests
 ├── package.json
@@ -93,21 +82,6 @@ curl http://localhost:7071/api/users/<user-id> \
 # List users
 curl http://localhost:7071/api/users \
   -H "Authorization: Bearer $TOKEN"
-
-# Upload a file (JSON with base64)
-curl -X POST http://localhost:7071/api/files/upload \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"fileName":"test.txt","fileData":"SGVsbG8gV29ybGQh","mimeType":"text/plain"}'
-
-# List files
-curl http://localhost:7071/api/files \
-  -H "Authorization: Bearer $TOKEN"
-
-# Download a file
-curl http://localhost:7071/api/files/<file-id> \
-  -H "Authorization: Bearer $TOKEN" \
-  -o downloaded-file.txt
 ```
 
 ## Pre-seeded Users
@@ -184,53 +158,129 @@ throw new AppError(ErrorCode.NOT_FOUND, 'User not found');
 // Automatically returns: { status: 404, jsonBody: { error: { ... } } }
 ```
 
-### 5. File Uploads
+---
 
-The package supports file uploads with flexible parsing:
+## Integrating with External Services
+
+### Azure Cosmos DB Integration
+
+Azure Cosmos DB works seamlessly with the package. Keep database logic in your service layer:
 
 ```typescript
-const uploadHandler = createHandler(
-  async (request, _context, { user }) => {
-    // Handle JSON with base64-encoded file
-    const body = await request.json();
-    const fileBuffer = Buffer.from(body.fileData, 'base64');
+// Install: npm install @azure/cosmos
+import { CosmosClient } from '@azure/cosmos';
+import { AppError, ErrorCode } from '@qops/hub-kit';
 
-    // Upload to storage and save metadata
-    const file = await uploadFile(fileBuffer, body.fileName, body.mimeType, user!.sub);
+const client = new CosmosClient({
+  endpoint: process.env.COSMOS_ENDPOINT!,
+  key: process.env.COSMOS_KEY!,
+});
 
-    return { status: 201, jsonBody: file };
+const container = client.database('mydb').container('users');
+
+export async function getUserById(id: string) {
+  try {
+    const { resource } = await container.item(id, id).read();
+    return resource;
+  } catch (error: any) {
+    if (error.code === 404) {
+      throw new AppError(ErrorCode.NOT_FOUND, 'User not found');
+    }
+    throw new AppError(ErrorCode.INTERNAL_ERROR, 'Database error');
+  }
+}
+
+export async function createUser(user: any) {
+  try {
+    const { resource } = await container.items.create(user);
+    return resource;
+  } catch (error: any) {
+    if (error.code === 409) {
+      throw new AppError(ErrorCode.CONFLICT, 'User already exists');
+    }
+    throw new AppError(ErrorCode.INTERNAL_ERROR, 'Database error');
+  }
+}
+```
+
+Then use in your handler:
+
+```typescript
+const handler = createHandler(
+  async (request, context, { user }) => {
+    const userData = await getUserById(request.params.id);
+    return { status: 200, jsonBody: userData };
   },
   {
-    jwtConfig: { secret: process.env.JWT_SECRET },
+    jwtConfig: { secret: process.env.JWT_SECRET! },
     requiredRoles: [UserRole.MEMBER],
-    skipBodyParsing: true, // Important for file uploads
-  },
+  }
 );
 ```
 
-### 6. Database Integration
+### Azure Blob Storage Integration
 
-The package works seamlessly with any database. Examples provided for:
+File uploads work naturally with the package:
 
-- **Azure Cosmos DB** - NoSQL database
-- **Azure SQL Database** - Relational database
-- **PostgreSQL** - Open-source relational database
-- **MongoDB** - Document database
-- **MySQL** - Relational database
+```typescript
+// Install: npm install @azure/storage-blob
+import { BlobServiceClient } from '@azure/storage-blob';
+import { AppError, ErrorCode } from '@qops/hub-kit';
 
-See `services/database.example.ts` for complete examples.
+const blobServiceClient = BlobServiceClient.fromConnectionString(
+  process.env.AZURE_STORAGE_CONNECTION_STRING!
+);
+const containerClient = blobServiceClient.getContainerClient('uploads');
 
-### 7. Blob Storage Integration
+export async function uploadFile(buffer: Buffer, fileName: string, userId: string) {
+  try {
+    const blobName = `${userId}/${Date.now()}-${fileName}`;
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    
+    await blockBlobClient.upload(buffer, buffer.length);
+    
+    return {
+      id: blobName,
+      url: blockBlobClient.url,
+      size: buffer.length,
+    };
+  } catch (error: any) {
+    throw new AppError(ErrorCode.INTERNAL_ERROR, 'Upload failed');
+  }
+}
+```
 
-Azure Blob Storage integration example shows how to:
+File upload handler (no bodySchema for custom parsing):
 
-- Upload files to blob storage
-- Download files from blob storage
-- Generate SAS URLs for temporary access
-- List blobs in a container
-- Delete blobs
+```typescript
+const uploadHandler = createHandler(
+  async (request, context, { user }) => {
+    const body = await request.json();
+    const fileBuffer = Buffer.from(body.data, 'base64');
+    
+    // Validate file size
+    if (fileBuffer.length > 10 * 1024 * 1024) {
+      throw new AppError(ErrorCode.BAD_REQUEST, 'File too large');
+    }
+    
+    const file = await uploadFile(fileBuffer, body.filename, user!.sub);
+    return { status: 201, jsonBody: file };
+  },
+  {
+    jwtConfig: { secret: process.env.JWT_SECRET! },
+    requiredRoles: [UserRole.MEMBER],
+    // No bodySchema - allows manual body parsing
+  }
+);
+```
 
-See `services/blob-storage.example.ts` for complete examples.
+**Key Points:**
+- Keep database/storage logic in service layer
+- Use `AppError` for consistent error responses
+- Omit `bodySchema` for custom body parsing (file uploads)
+- Store connection clients at module level (reused across invocations)
+
+---
 
 ## Integration Test Results
 

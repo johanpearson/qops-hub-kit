@@ -1,340 +1,175 @@
 # @qops/hub-kit
 
-A utility package for creating Azure Function v4 APIs with TypeScript. Removes boilerplate for auth, validation, error handling, and OpenAPI docs.
+A lightweight utility package for creating Azure Function v4 APIs with TypeScript. Eliminates boilerplate for JWT authentication, request validation, error handling, and more.
+
+## Features
+
+✅ **Simple Handler Wrapper** - Single function that handles all middleware  
+✅ **JWT Authentication** - Built-in token verification with role-based access control  
+✅ **Request Validation** - Type-safe validation using Zod schemas  
+✅ **Error Handling** - Consistent error responses with HTTP status mapping  
+✅ **Correlation IDs** - Automatic request tracking for distributed tracing  
+✅ **OpenAPI Support** - Generate OpenAPI v3 documentation from Zod schemas
 
 ## Installation
 
 ```bash
-npm install @qops/hub-kit
+npm install @qops/hub-kit zod jsonwebtoken
+npm install -D @types/jsonwebtoken
 ```
 
 ## Quick Start
 
-### Project Structure
-
-```
-my-api/
-├── src/
-│   ├── services/
-│   │   └── user.service.ts      # Business logic
-│   ├── functions/
-│   │   ├── login.ts              # Login endpoint
-│   │   ├── get-user.ts           # Get user by ID
-│   │   └── list-users.ts         # List all users
-│   └── index.ts                  # Register functions
-├── package.json
-└── host.json
-```
-
-### 1. Create Service Layer (Business Logic)
-
-**`src/services/user.service.ts`**
+### 1. Basic Handler (No Auth)
 
 ```typescript
-import { randomUUID } from 'crypto';
-import { AppError, ErrorCode } from '@qops/hub-kit';
+// functions/hello.ts
+import { createHandler, z } from '@qops/hub-kit';
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  role: 'admin' | 'member';
-}
-
-// In-memory store (use database in production)
-const users = new Map<string, User>();
-const emailIndex = new Map<string, string>();
-
-// Seed admin user
-const adminId = randomUUID();
-users.set(adminId, {
-  id: adminId,
-  email: 'admin@example.com',
-  name: 'Admin User',
-  passwordHash: 'hashed_admin_password', // Use bcrypt in production
-  role: 'admin',
+const schema = z.object({
+  name: z.string().min(1),
 });
-emailIndex.set('admin@example.com', adminId);
 
-export async function authenticateUser(email: string, password: string) {
-  const userId = emailIndex.get(email);
-  if (!userId) {
-    throw new AppError(ErrorCode.UNAUTHORIZED, 'Invalid credentials');
+export default createHandler(
+  async (request, context, { body }) => {
+    return { 
+      status: 200, 
+      jsonBody: { message: `Hello, ${body.name}!` } 
+    };
+  },
+  {
+    bodySchema: schema,
+    enableLogging: true,
   }
-
-  const user = users.get(userId);
-  if (!user || user.passwordHash !== \`hashed_\${password}\`) {
-    throw new AppError(ErrorCode.UNAUTHORIZED, 'Invalid credentials');
-  }
-
-  return {
-    sub: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-  };
-}
-
-export async function getUserById(id: string) {
-  const user = users.get(id);
-  if (!user) {
-    throw new AppError(ErrorCode.NOT_FOUND, 'User not found');
-  }
-
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-  };
-}
-
-export async function listUsers() {
-  return Array.from(users.values()).map((user) => ({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-  }));
-}
+);
 ```
 
-### 2. Create Functions
-
-**`src/functions/login.ts`**
+### 2. Protected Handler (With JWT Auth)
 
 ```typescript
-import { app } from '@azure/functions';
+// functions/get-user.ts
+import { createHandler, UserRole } from '@qops/hub-kit';
+
+export default createHandler(
+  async (request, context, { user }) => {
+    const userId = request.params.id;
+    // Fetch user from database
+    const userData = await getUserById(userId);
+    
+    return { status: 200, jsonBody: userData };
+  },
+  {
+    jwtConfig: { secret: process.env.JWT_SECRET! },
+    requiredRoles: [UserRole.MEMBER], // or [UserRole.ADMIN]
+    enableLogging: true,
+  }
+);
+```
+
+### 3. Login Handler (Generate JWT)
+
+```typescript
+// functions/login.ts
 import { createHandler, z } from '@qops/hub-kit';
 import jwt from 'jsonwebtoken';
-import { authenticateUser } from '../services/user.service';
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
 
-const loginHandler = createHandler(
+export default createHandler(
   async (request, context, { body }) => {
+    // Verify credentials (from database)
     const user = await authenticateUser(body.email, body.password);
-
-    const token = jwt.sign(user, process.env.JWT_SECRET || 'your-secret-key', {
-      expiresIn: '24h',
-    });
-
-    return {
-      status: 200,
-      jsonBody: {
-        token,
-        user,
+    
+    // Generate JWT with required claims
+    const token = jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role, // 'admin' or 'member'
       },
-    };
+      process.env.JWT_SECRET!,
+      { expiresIn: '24h' }
+    );
+    
+    return { status: 200, jsonBody: { token, user } };
   },
   {
     bodySchema: loginSchema,
     enableLogging: true,
-  },
-);
-
-app.http('login', {
-  methods: ['POST'],
-  authLevel: 'anonymous',
-  route: 'auth/login',
-  handler: loginHandler,
-});
-```
-
-**`src/functions/get-user.ts`**
-
-```typescript
-import { app } from '@azure/functions';
-import { createHandler, UserRole } from '@qops/hub-kit';
-import { getUserById } from '../services/user.service';
-
-const getUserHandler = createHandler(
-  async (request, context, { user }) => {
-    const userId = request.params.id;
-    const userData = await getUserById(userId);
-
-    return {
-      status: 200,
-      jsonBody: userData,
-    };
-  },
-  {
-    jwtConfig: {
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-    },
-    requiredRoles: [UserRole.MEMBER, UserRole.ADMIN],
-    enableLogging: true,
-  },
-);
-
-app.http('getUser', {
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  route: 'users/{id}',
-  handler: getUserHandler,
-});
-```
-
-**`src/functions/list-users.ts`**
-
-```typescript
-import { app } from '@azure/functions';
-import { createHandler, UserRole } from '@qops/hub-kit';
-import { listUsers } from '../services/user.service';
-
-const listUsersHandler = createHandler(
-  async (request, context, { user }) => {
-    const users = await listUsers();
-
-    return {
-      status: 200,
-      jsonBody: {
-        users,
-        total: users.length,
-      },
-    };
-  },
-  {
-    jwtConfig: {
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-    },
-    requiredRoles: [UserRole.MEMBER, UserRole.ADMIN],
-    enableLogging: true,
-  },
-);
-
-app.http('listUsers', {
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  route: 'users',
-  handler: listUsersHandler,
-});
-```
-
-### 3. Test Your API
-
-```bash
-# Start the function app
-npm start
-
-# Login to get token
-curl -X POST http://localhost:7071/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"admin_password"}'
-
-# Use the token from the response
-export TOKEN="<your-token-here>"
-
-# Get user by ID
-curl http://localhost:7071/api/users/<user-id> \
-  -H "Authorization: Bearer $TOKEN"
-
-# List all users
-curl http://localhost:7071/api/users \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-## JWT Claims
-
-The JWT token includes these claims:
-
-- `sub`: User ID
-- `email`: User email
-- `name`: User name
-- `role`: User role ('admin' or 'member')
-
-## API Reference
-
-### `createHandler(handler, config)`
-
-Creates an Azure Function handler with built-in middleware.
-
-**Config options:**
-
-- `bodySchema`: Zod schema for request body validation
-- `querySchema`: Zod schema for query parameters validation
-- `jwtConfig`: JWT configuration
-  - `secret`: Secret for JWT verification
-  - `algorithms`: Allowed algorithms (default: `['HS256']`)
-- `requiredRoles`: Array of required roles (`UserRole.MEMBER` | `UserRole.ADMIN`)
-- `enableLogging`: Enable request/response logging
-
-**Handler receives:**
-
-- `request`: Azure Functions `HttpRequest`
-- `context`: Azure Functions `InvocationContext`
-- `parsedData`: Object containing:
-  - `body`: Validated request body (only if `bodySchema` provided)
-  - `query`: Validated query parameters (only if `querySchema` provided)
-  - `user`: Authenticated user (contains `sub`, `email`, `name`, `role`)
-  - `correlationId`: Request correlation ID
-
-### File Uploads
-
-Handle file uploads by not specifying a `bodySchema`, which allows manual body parsing:
-
-```typescript
-import { createHandler, UserRole } from '@qops/hub-kit';
-
-export default createHandler(
-  async (request, _context, { user }) => {
-    const contentType = request.headers.get('content-type') || 'application/octet-stream';
-
-    if (contentType.includes('application/json')) {
-      // Handle JSON with base64-encoded file
-      const body = await request.json();
-      const fileBuffer = Buffer.from(body.fileData, 'base64');
-      // Upload to storage...
-    } else {
-      // Handle raw binary upload
-      const arrayBuffer = await request.arrayBuffer();
-      const fileBuffer = Buffer.from(arrayBuffer);
-      // Upload to storage...
-    }
-
-    return { status: 201, jsonBody: { message: 'File uploaded' } };
-  },
-  {
-    jwtConfig: { secret: process.env.JWT_SECRET! },
-    requiredRoles: [UserRole.MEMBER],
-    // Note: No bodySchema specified, so body won't be automatically parsed
-    // This allows us to manually handle the request body for file uploads
-  },
+  }
 );
 ```
 
-### Database Integration
-
-The package works seamlessly with any database. Keep database logic in the service layer:
-
-**PostgreSQL Example:**
+## Handler Options
 
 ```typescript
-// services/database.ts
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
-
-export async function getUserFromDb(id: string) {
-  const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-  return result.rows[0];
+interface HandlerOptions {
+  // Request validation
+  bodySchema?: ZodSchema;           // Validate request body
+  querySchema?: ZodSchema;          // Validate query parameters
+  
+  // Authentication
+  jwtConfig?: {
+    secret: string;                 // JWT secret key
+    algorithms?: string[];          // Default: ['HS256']
+  };
+  requiredRoles?: UserRole[];       // Require specific roles
+  
+  // Other
+  enableLogging?: boolean;          // Log requests/responses
 }
 ```
 
-**Azure Cosmos DB Example:**
+## Handler Context
+
+The handler function receives enriched context:
 
 ```typescript
-// services/database.ts
+async (request, context, enrichedContext) => {
+  // enrichedContext includes:
+  const {
+    body,          // Validated request body (if bodySchema provided)
+    query,         // Validated query params (if querySchema provided)
+    user,          // JWT payload (if jwtConfig provided): { sub, email, name, role }
+    correlationId, // Unique ID for request tracking
+  } = enrichedContext;
+}
+```
+
+## Error Handling
+
+Use `AppError` for consistent error responses:
+
+```typescript
+import { AppError, ErrorCode } from '@qops/hub-kit';
+
+// Throw errors anywhere in your code
+throw new AppError(ErrorCode.NOT_FOUND, 'User not found');
+throw new AppError(ErrorCode.UNAUTHORIZED, 'Invalid credentials');
+throw new AppError(ErrorCode.BAD_REQUEST, 'Invalid input', { field: 'email' });
+
+// Available error codes:
+// - BAD_REQUEST (400)
+// - UNAUTHORIZED (401)
+// - FORBIDDEN (403)
+// - NOT_FOUND (404)
+// - CONFLICT (409)
+// - VALIDATION_ERROR (422)
+// - INTERNAL_ERROR (500)
+```
+
+## Integration Examples
+
+### Azure Cosmos DB
+
+```typescript
+// services/user.service.ts
 import { CosmosClient } from '@azure/cosmos';
+import { AppError, ErrorCode } from '@qops/hub-kit';
 
 const client = new CosmosClient({
   endpoint: process.env.COSMOS_ENDPOINT!,
@@ -343,102 +178,151 @@ const client = new CosmosClient({
 
 const container = client.database('mydb').container('users');
 
-export async function getUserFromCosmos(id: string) {
-  const { resource } = await container.item(id, id).read();
-  return resource;
+export async function getUserById(id: string) {
+  try {
+    const { resource } = await container.item(id, id).read();
+    return resource;
+  } catch (error: any) {
+    if (error.code === 404) {
+      throw new AppError(ErrorCode.NOT_FOUND, 'User not found');
+    }
+    throw new AppError(ErrorCode.INTERNAL_ERROR, 'Database error');
+  }
 }
 ```
 
-See `example/src/services/database.example.ts` for more examples (MongoDB, Azure SQL, MySQL).
-
-### Blob Storage Integration
-
-**Azure Blob Storage Example:**
+### Azure Blob Storage
 
 ```typescript
-// services/storage.ts
+// services/file.service.ts
 import { BlobServiceClient } from '@azure/storage-blob';
+import { AppError, ErrorCode } from '@qops/hub-kit';
 
-const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING!);
+const blobServiceClient = BlobServiceClient.fromConnectionString(
+  process.env.AZURE_STORAGE_CONNECTION_STRING!
+);
 const containerClient = blobServiceClient.getContainerClient('uploads');
 
-export async function uploadToBlob(fileBuffer: Buffer, fileName: string) {
-  const blobClient = containerClient.getBlockBlobClient(fileName);
-  await blobClient.upload(fileBuffer, fileBuffer.length);
-  return blobClient.url;
+export async function uploadFile(buffer: Buffer, fileName: string) {
+  try {
+    const blobClient = containerClient.getBlockBlobClient(fileName);
+    await blobClient.upload(buffer, buffer.length);
+    return blobClient.url;
+  } catch (error: any) {
+    throw new AppError(ErrorCode.INTERNAL_ERROR, 'Upload failed');
+  }
 }
+
+// Handler for file upload (no bodySchema for custom parsing)
+export default createHandler(
+  async (request, context, { user }) => {
+    const body = await request.json();
+    const fileBuffer = Buffer.from(body.data, 'base64');
+    
+    const url = await uploadFile(fileBuffer, body.filename);
+    return { status: 201, jsonBody: { url } };
+  },
+  {
+    jwtConfig: { secret: process.env.JWT_SECRET! },
+    requiredRoles: [UserRole.MEMBER],
+    // No bodySchema - allows manual body parsing
+  }
+);
 ```
 
-See `example/src/services/blob-storage.example.ts` for complete integration examples.
+## OpenAPI Documentation
 
-### Error Handling
-
-Use the provided error types for consistent responses:
+Generate OpenAPI v3 documentation:
 
 ```typescript
-import { AppError, ErrorCode, createNotFoundError } from '@qops/hub-kit';
+import { OpenApiBuilder, z } from '@qops/hub-kit';
 
-// Throw errors
-throw new AppError(ErrorCode.NOT_FOUND, 'User not found');
-throw createNotFoundError('User not found');
+const builder = new OpenApiBuilder({
+  title: 'My API',
+  version: '1.0.0',
+  description: 'API documentation',
+});
+
+// Register routes
+builder.registerRoute({
+  method: 'POST',
+  path: '/api/users',
+  summary: 'Create user',
+  requestBody: z.object({
+    email: z.string().email(),
+    name: z.string(),
+  }),
+  responses: {
+    201: {
+      description: 'User created',
+      schema: z.object({
+        id: z.string(),
+        email: z.string(),
+        name: z.string(),
+      }),
+    },
+  },
+  requiresAuth: true,
+});
+
+// Generate OpenAPI document
+const openApiDoc = builder.generateDocument();
+
+// Serve it
+export default createHandler(
+  async () => ({ status: 200, jsonBody: openApiDoc }),
+  { enableLogging: false }
+);
 ```
 
-**Error codes:**
+## Environment Variables
 
-- `BAD_REQUEST` (400)
-- `UNAUTHORIZED` (401)
-- `FORBIDDEN` (403)
-- `NOT_FOUND` (404)
-- `CONFLICT` (409)
-- `VALIDATION_ERROR` (422)
-- `INTERNAL_ERROR` (500)
+Required environment variables:
+
+```env
+JWT_SECRET=your-secret-key-here
+FUNCTIONS_WORKER_RUNTIME=node
+```
+
+Optional (for examples above):
+
+```env
+COSMOS_ENDPOINT=https://your-account.documents.azure.com:443/
+COSMOS_KEY=your-cosmos-key
+AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
+```
+
+## Best Practices
+
+1. **Service Layer**: Keep business logic in service files, separate from handlers
+2. **Error Handling**: Use `AppError` for consistent error responses
+3. **Environment Variables**: Store secrets in environment variables
+4. **JWT Claims**: Always include `sub`, `email`, `name`, and `role` in JWT tokens
+5. **Validation**: Use Zod schemas for all user input
+6. **Testing**: Service functions are easy to unit test independently
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Lint
+npm run lint
+
+# Format
+npm run format
+```
 
 ## License
 
 MIT
-
-## Development
-
-### Testing
-
-Run tests:
-
-```bash
-npm test
-```
-
-Run tests with coverage:
-
-```bash
-npm run test:coverage
-```
-
-Coverage requirements: 80% for lines, functions, branches, and statements.
-
-### Linting & Formatting
-
-Format code:
-
-```bash
-npm run format
-```
-
-Lint code:
-
-```bash
-npm run lint
-```
-
-Auto-fix linting issues:
-
-```bash
-npm run lint:fix
-```
-
-### Pre-commit Hooks
-
-Husky runs automatically on commit to:
-
-- Format all staged files with Prettier
-- Fix linting issues with ESLint
-- Ensure code quality before commit

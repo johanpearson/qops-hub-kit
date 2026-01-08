@@ -19,7 +19,9 @@ pool:
 
 variables:
   nodeVersion: '18.x'
-  artifactFeedName: 'qops-feed' # Update this to match your Azure Artifacts feed name
+  # IMPORTANT: Update this to match your Azure Artifacts feed name
+  # Example: 'my-organization-feed'
+  artifactFeedName: 'qops-feed'
 
 stages:
   - stage: Version
@@ -40,7 +42,7 @@ stages:
               workingDir: '$(Build.SourcesDirectory)'
 
           - bash: |
-              git config user.email "azure-pipelines@qops.com"
+              git config user.email "azure-pipelines@noreply.example.com"
               git config user.name "Azure Pipelines"
             displayName: 'Configure Git'
 
@@ -159,7 +161,7 @@ stages:
             persistCredentials: true
 
           - bash: |
-              git config user.email "azure-pipelines@qops.com"
+              git config user.email "azure-pipelines@noreply.example.com"
               git config user.name "Azure Pipelines"
               
               # Create and push tag

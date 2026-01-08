@@ -11,6 +11,328 @@ A lightweight utility package for creating Azure Function v4 APIs with TypeScrip
 ✅ **Correlation IDs** - Automatic request tracking for distributed tracing  
 ✅ **OpenAPI Support** - Generate OpenAPI v3 documentation from Zod schemas
 
+---
+
+## Getting Started - Complete Example
+
+This section shows you how to set up a complete Azure Functions project using @qops/hub-kit from scratch.
+
+### 1. Create .npmrc (if using private registry)
+
+```ini
+# .npmrc
+@qops:registry=https://your-private-registry.com/
+//your-private-registry.com/:_authToken=${NPM_TOKEN}
+```
+
+### 2. Install Dependencies
+
+```bash
+npm init -y
+npm install @qops/hub-kit zod jsonwebtoken @azure/functions
+npm install -D @types/node @types/jsonwebtoken typescript @azure/functions
+```
+
+### 3. Project Structure
+
+Here's a recommended project structure:
+
+```
+my-api/
+├── .npmrc                          # Private registry configuration
+├── package.json                    # Dependencies and scripts
+├── tsconfig.json                   # TypeScript configuration
+├── host.json                       # Azure Functions configuration
+├── local.settings.json             # Environment variables (local)
+├── src/
+│   ├── services/                   # Business logic
+│   │   └── user.service.ts
+│   └── functions/                  # Azure Function handlers
+│       ├── login.ts
+│       ├── get-user.ts
+│       └── list-users.ts
+└── README.md
+```
+
+### 4. Configuration Files
+
+**tsconfig.json**
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+**package.json** (add these scripts)
+```json
+{
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rimraf dist"
+  }
+}
+```
+
+**host.json**
+```json
+{
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "maxTelemetryItemsPerSecond": 20
+      }
+    }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.*, 5.0.0)"
+  }
+}
+```
+
+**local.settings.json**
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "JWT_SECRET": "your-secret-key-change-this-in-production"
+  }
+}
+```
+
+### 5. Service Layer (Business Logic)
+
+**src/services/user.service.ts**
+```typescript
+import { AppError, ErrorCode } from '@qops/hub-kit';
+import { randomUUID } from 'node:crypto';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  role: 'admin' | 'member';
+}
+
+export interface UserResponse {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
+// In-memory storage (use a real database in production)
+const users = new Map<string, User>();
+const emailIndex = new Map<string, string>();
+
+// Seed data
+const adminUser: User = {
+  id: randomUUID(),
+  email: 'admin@example.com',
+  name: 'Admin User',
+  passwordHash: 'hashed_admin_password', // Use bcrypt in production
+  role: 'admin',
+};
+users.set(adminUser.id, adminUser);
+emailIndex.set(adminUser.email, adminUser.id);
+
+export async function authenticateUser(email: string, password: string): Promise<UserResponse> {
+  const userId = emailIndex.get(email);
+  if (!userId) {
+    throw new AppError(ErrorCode.UNAUTHORIZED, 'Invalid credentials');
+  }
+
+  const user = users.get(userId);
+  if (!user || user.passwordHash !== `hashed_${password}`) {
+    throw new AppError(ErrorCode.UNAUTHORIZED, 'Invalid credentials');
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  };
+}
+
+export async function getUserById(id: string): Promise<UserResponse> {
+  const user = users.get(id);
+  if (!user) {
+    throw new AppError(ErrorCode.NOT_FOUND, 'User not found');
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  };
+}
+
+export async function getAllUsers(): Promise<UserResponse[]> {
+  return Array.from(users.values()).map(user => ({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  }));
+}
+```
+
+### 6. Function Handlers
+
+**src/functions/login.ts**
+```typescript
+import { app } from '@azure/functions';
+import { createHandler, z } from '@qops/hub-kit';
+import jwt from 'jsonwebtoken';
+import { authenticateUser } from '../services/user.service.js';
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+const loginHandler = createHandler(
+  async (request, context, { body }) => {
+    const user = await authenticateUser(body.email, body.password);
+
+    const token = jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: '24h' }
+    );
+
+    return {
+      status: 200,
+      jsonBody: { token, user },
+    };
+  },
+  {
+    bodySchema: loginSchema,
+    enableLogging: true,
+  }
+);
+
+app.http('login', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'auth/login',
+  handler: loginHandler,
+});
+```
+
+**src/functions/get-user.ts**
+```typescript
+import { app } from '@azure/functions';
+import { createHandler, UserRole } from '@qops/hub-kit';
+import { getUserById } from '../services/user.service.js';
+
+const getUserHandler = createHandler(
+  async (request, context, { user }) => {
+    const userId = request.params.id;
+    const userData = await getUserById(userId);
+
+    return {
+      status: 200,
+      jsonBody: userData,
+    };
+  },
+  {
+    jwtConfig: { secret: process.env.JWT_SECRET! },
+    requiredRoles: [UserRole.MEMBER],
+    enableLogging: true,
+  }
+);
+
+app.http('getUser', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'users/{id}',
+  handler: getUserHandler,
+});
+```
+
+**src/functions/list-users.ts**
+```typescript
+import { app } from '@azure/functions';
+import { createHandler, UserRole } from '@qops/hub-kit';
+import { getAllUsers } from '../services/user.service.js';
+
+const listUsersHandler = createHandler(
+  async (request, context, { user }) => {
+    const users = await getAllUsers();
+
+    return {
+      status: 200,
+      jsonBody: { users, total: users.length },
+    };
+  },
+  {
+    jwtConfig: { secret: process.env.JWT_SECRET! },
+    requiredRoles: [UserRole.MEMBER],
+    enableLogging: true,
+  }
+);
+
+app.http('listUsers', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'users',
+  handler: listUsersHandler,
+});
+```
+
+### 7. Test Your API
+
+```bash
+# Build
+npm run build
+
+# Start Azure Functions locally
+func start
+
+# Test login
+curl -X POST http://localhost:7071/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"admin_password"}'
+
+# Response: { "token": "eyJhbGc...", "user": {...} }
+
+# Test protected endpoint
+curl http://localhost:7071/api/users \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+That's it! You now have a working Azure Functions API with authentication, validation, and error handling.
+
+---
+
 ## Installation
 
 ```bash
@@ -18,9 +340,9 @@ npm install @qops/hub-kit zod jsonwebtoken
 npm install -D @types/jsonwebtoken
 ```
 
-## Quick Start
+## API Reference
 
-### 1. Basic Handler (No Auth)
+### Basic Handler (No Auth)
 
 ```typescript
 // functions/hello.ts
@@ -44,7 +366,7 @@ export default createHandler(
 );
 ```
 
-### 2. Protected Handler (With JWT Auth)
+### Protected Handler (With JWT Auth)
 
 ```typescript
 // functions/get-user.ts
@@ -66,7 +388,7 @@ export default createHandler(
 );
 ```
 
-### 3. Login Handler (Generate JWT)
+### Login Handler (Generate JWT)
 
 ```typescript
 // functions/login.ts

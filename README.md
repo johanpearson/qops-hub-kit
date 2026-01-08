@@ -9,7 +9,8 @@ A lightweight utility package for creating Azure Function v4 APIs with TypeScrip
 ✅ **Request Validation** - Type-safe validation using Zod schemas  
 ✅ **Error Handling** - Consistent error responses with HTTP status mapping  
 ✅ **Correlation IDs** - Automatic request tracking for distributed tracing  
-✅ **OpenAPI Support** - Generate OpenAPI v3 documentation from Zod schemas
+✅ **OpenAPI Support** - Generate OpenAPI v3 documentation from Zod schemas  
+✅ **Health Check Endpoint** - Ready-to-use health check handler
 
 ---
 
@@ -57,6 +58,7 @@ my-api/
 ### 4. Configuration Files
 
 **tsconfig.json**
+
 ```json
 {
   "compilerOptions": {
@@ -77,6 +79,7 @@ my-api/
 ```
 
 **package.json** (add these scripts)
+
 ```json
 {
   "type": "module",
@@ -89,6 +92,7 @@ my-api/
 ```
 
 **host.json**
+
 ```json
 {
   "version": "2.0",
@@ -108,6 +112,7 @@ my-api/
 ```
 
 **local.settings.json**
+
 ```json
 {
   "IsEncrypted": false,
@@ -122,6 +127,7 @@ my-api/
 ### 5. Service Layer (Business Logic)
 
 **src/services/user.service.ts**
+
 ```typescript
 import { AppError, ErrorCode } from '@qops/hub-kit';
 import { randomUUID } from 'node:crypto';
@@ -190,7 +196,7 @@ export async function getUserById(id: string): Promise<UserResponse> {
 }
 
 export async function getAllUsers(): Promise<UserResponse[]> {
-  return Array.from(users.values()).map(user => ({
+  return Array.from(users.values()).map((user) => ({
     id: user.id,
     email: user.email,
     name: user.name,
@@ -202,6 +208,7 @@ export async function getAllUsers(): Promise<UserResponse[]> {
 ### 6. Function Handlers
 
 **src/functions/login.ts**
+
 ```typescript
 import { app } from '@azure/functions';
 import { createHandler, z } from '@qops/hub-kit';
@@ -225,7 +232,7 @@ const loginHandler = createHandler(
         role: user.role,
       },
       process.env.JWT_SECRET!,
-      { expiresIn: '24h' }
+      { expiresIn: '24h' },
     );
 
     return {
@@ -236,7 +243,7 @@ const loginHandler = createHandler(
   {
     bodySchema: loginSchema,
     enableLogging: true,
-  }
+  },
 );
 
 app.http('login', {
@@ -248,6 +255,7 @@ app.http('login', {
 ```
 
 **src/functions/get-user.ts**
+
 ```typescript
 import { app } from '@azure/functions';
 import { createHandler, UserRole } from '@qops/hub-kit';
@@ -267,7 +275,7 @@ const getUserHandler = createHandler(
     jwtConfig: { secret: process.env.JWT_SECRET! },
     requiredRoles: [UserRole.MEMBER],
     enableLogging: true,
-  }
+  },
 );
 
 app.http('getUser', {
@@ -279,6 +287,7 @@ app.http('getUser', {
 ```
 
 **src/functions/list-users.ts**
+
 ```typescript
 import { app } from '@azure/functions';
 import { createHandler, UserRole } from '@qops/hub-kit';
@@ -297,7 +306,7 @@ const listUsersHandler = createHandler(
     jwtConfig: { secret: process.env.JWT_SECRET! },
     requiredRoles: [UserRole.MEMBER],
     enableLogging: true,
-  }
+  },
 );
 
 app.http('listUsers', {
@@ -308,14 +317,30 @@ app.http('listUsers', {
 });
 ```
 
+**src/functions/health.ts**
+
+```typescript
+import { app } from '@azure/functions';
+import { createHealthHandler } from '@qops/hub-kit';
+
+// Simple health check endpoint - no configuration needed!
+app.http('health', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'health',
+  handler: createHealthHandler(),
+});
+```
+
 ### 7. OpenAPI Documentation (Optional)
 
 Add an OpenAPI endpoint to document your API:
 
 **src/functions/openapi.ts**
+
 ```typescript
 import { app } from '@azure/functions';
-import { OpenApiBuilder } from '@qops/hub-kit';
+import { OpenApiBuilder, healthCheckResponseSchema } from '@qops/hub-kit';
 import { z } from 'zod';
 
 // Define your schemas
@@ -409,6 +434,22 @@ builder.registerRoute({
   requiresAuth: true,
 });
 
+// Optional: Register health check endpoint
+builder.registerRoute({
+  method: 'GET',
+  path: '/api/health',
+  summary: 'Health check',
+  description: 'Check API health status',
+  tags: ['Health'],
+  responses: {
+    200: {
+      description: 'Service is healthy',
+      schema: healthCheckResponseSchema,
+    },
+  },
+  requiresAuth: false,
+});
+
 // Generate and serve OpenAPI document
 app.http('openapi', {
   methods: ['GET'],
@@ -434,6 +475,11 @@ npm run build
 
 # Start Azure Functions locally
 func start
+
+# Test health endpoint (no auth required)
+curl http://localhost:7071/api/health
+
+# Response: { "status": "healthy", "timestamp": "2024-01-08T19:00:00.000Z", "uptime": 123.45 }
 
 # Test login
 curl -X POST http://localhost:7071/api/auth/login \
@@ -475,7 +521,7 @@ To change the `/api` prefix (or remove it entirely), add this to your `host.json
   "version": "2.0",
   "extensions": {
     "http": {
-      "routePrefix": "v1"  // Changes /api to /v1
+      "routePrefix": "v1" // Changes /api to /v1
       // or use "" to remove the prefix entirely
     }
   }
@@ -483,6 +529,7 @@ To change the `/api` prefix (or remove it entirely), add this to your `host.json
 ```
 
 **Examples:**
+
 - `"routePrefix": "v1"` → `http://localhost:7071/v1/auth/login`
 - `"routePrefix": ""` → `http://localhost:7071/auth/login`
 - `"routePrefix": "api/v2"` → `http://localhost:7071/api/v2/auth/login`
@@ -512,15 +559,15 @@ const schema = z.object({
 
 export default createHandler(
   async (request, context, { body }) => {
-    return { 
-      status: 200, 
-      jsonBody: { message: `Hello, ${body.name}!` } 
+    return {
+      status: 200,
+      jsonBody: { message: `Hello, ${body.name}!` },
     };
   },
   {
     bodySchema: schema,
     enableLogging: true,
-  }
+  },
 );
 ```
 
@@ -535,14 +582,14 @@ export default createHandler(
     const userId = request.params.id;
     // Fetch user from database
     const userData = await getUserById(userId);
-    
+
     return { status: 200, jsonBody: userData };
   },
   {
     jwtConfig: { secret: process.env.JWT_SECRET! },
     requiredRoles: [UserRole.MEMBER], // or [UserRole.ADMIN]
     enableLogging: true,
-  }
+  },
 );
 ```
 
@@ -562,7 +609,7 @@ export default createHandler(
   async (request, context, { body }) => {
     // Verify credentials (from database)
     const user = await authenticateUser(body.email, body.password);
-    
+
     // Generate JWT with required claims
     const token = jwt.sign(
       {
@@ -572,16 +619,67 @@ export default createHandler(
         role: user.role, // 'admin' or 'member'
       },
       process.env.JWT_SECRET!,
-      { expiresIn: '24h' }
+      { expiresIn: '24h' },
     );
-    
+
     return { status: 200, jsonBody: { token, user } };
   },
   {
     bodySchema: loginSchema,
     enableLogging: true,
-  }
+  },
 );
+```
+
+### Health Check Handler
+
+```typescript
+// functions/health.ts
+import { app } from '@azure/functions';
+import { createHealthHandler } from '@qops/hub-kit';
+
+// Ready-to-use health check endpoint - no configuration needed!
+app.http('health', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'health',
+  handler: createHealthHandler(),
+});
+
+// Response:
+// {
+//   "status": "healthy",
+//   "timestamp": "2024-01-08T19:00:00.000Z",
+//   "uptime": 123.45
+// }
+```
+
+The health check handler:
+
+- Returns a simple status response
+- Includes current timestamp in ISO 8601 format
+- Reports process uptime in seconds
+- Automatically adds correlation ID header
+- Requires no configuration or authentication
+
+**OpenAPI Schema**: Use `healthCheckResponseSchema` to document the health endpoint in your OpenAPI specification:
+
+```typescript
+import { OpenApiBuilder, healthCheckResponseSchema } from '@qops/hub-kit';
+
+builder.registerRoute({
+  method: 'GET',
+  path: '/api/health',
+  summary: 'Health check',
+  tags: ['Health'],
+  responses: {
+    200: {
+      description: 'Service is healthy',
+      schema: healthCheckResponseSchema,
+    },
+  },
+  requiresAuth: false,
+});
 ```
 
 ## Handler Options
@@ -589,18 +687,18 @@ export default createHandler(
 ```typescript
 interface HandlerOptions {
   // Request validation
-  bodySchema?: ZodSchema;           // Validate request body
-  querySchema?: ZodSchema;          // Validate query parameters
-  
+  bodySchema?: ZodSchema; // Validate request body
+  querySchema?: ZodSchema; // Validate query parameters
+
   // Authentication
   jwtConfig?: {
-    secret: string;                 // JWT secret key
-    algorithms?: string[];          // Default: ['HS256']
+    secret: string; // JWT secret key
+    algorithms?: string[]; // Default: ['HS256']
   };
-  requiredRoles?: UserRole[];       // Require specific roles
-  
+  requiredRoles?: UserRole[]; // Require specific roles
+
   // Other
-  enableLogging?: boolean;          // Log requests/responses
+  enableLogging?: boolean; // Log requests/responses
 }
 ```
 
@@ -612,12 +710,12 @@ The handler function receives enriched context:
 async (request, context, enrichedContext) => {
   // enrichedContext includes:
   const {
-    body,          // Validated request body (if bodySchema provided)
-    query,         // Validated query params (if querySchema provided)
-    user,          // JWT payload (if jwtConfig provided): { sub, email, name, role }
+    body, // Validated request body (if bodySchema provided)
+    query, // Validated query params (if querySchema provided)
+    user, // JWT payload (if jwtConfig provided): { sub, email, name, role }
     correlationId, // Unique ID for request tracking
   } = enrichedContext;
-}
+};
 ```
 
 ## Error Handling
@@ -678,9 +776,7 @@ export async function getUserById(id: string) {
 import { BlobServiceClient } from '@azure/storage-blob';
 import { AppError, ErrorCode } from '@qops/hub-kit';
 
-const blobServiceClient = BlobServiceClient.fromConnectionString(
-  process.env.AZURE_STORAGE_CONNECTION_STRING!
-);
+const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING!);
 const containerClient = blobServiceClient.getContainerClient('uploads');
 
 export async function uploadFile(buffer: Buffer, fileName: string) {
@@ -698,7 +794,7 @@ export default createHandler(
   async (request, context, { user }) => {
     const body = await request.json();
     const fileBuffer = Buffer.from(body.data, 'base64');
-    
+
     const url = await uploadFile(fileBuffer, body.filename);
     return { status: 201, jsonBody: { url } };
   },
@@ -706,7 +802,7 @@ export default createHandler(
     jwtConfig: { secret: process.env.JWT_SECRET! },
     requiredRoles: [UserRole.MEMBER],
     // No bodySchema - allows manual body parsing
-  }
+  },
 );
 ```
 
@@ -749,10 +845,7 @@ builder.registerRoute({
 const openApiDoc = builder.generateDocument();
 
 // Serve it
-export default createHandler(
-  async () => ({ status: 200, jsonBody: openApiDoc }),
-  { enableLogging: false }
-);
+export default createHandler(async () => ({ status: 200, jsonBody: openApiDoc }), { enableLogging: false });
 ```
 
 ## Environment Variables

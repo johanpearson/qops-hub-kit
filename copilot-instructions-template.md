@@ -42,6 +42,7 @@ tests/
 ## @qops/hub-kit Package Usage
 
 This project uses **@qops/hub-kit** for Azure Function v4 handlers with built-in:
+
 - JWT authentication with role-based access control
 - Request validation using Zod schemas
 - Consistent error handling
@@ -115,12 +116,14 @@ throw new AppError(ErrorCode.VALIDATION_ERROR, 'Invalid input', {
 ### JWT Authentication
 
 JWT tokens must include these claims:
+
 - `sub`: User ID (string)
 - `email`: User email (string)
 - `name`: User name (string)
 - `role`: User role ('admin' | 'member')
 
 Configure authentication in handlers:
+
 ```typescript
 {
   jwtConfig: { secret: process.env.JWT_SECRET! },
@@ -304,6 +307,7 @@ describe('moduleName', () => {
 **Location**: `src/services/user.service.ts`
 
 **Key Functions**:
+
 - `createUser(email, password, name, role)` - Creates a new user account
 - `authenticateUser(email, password)` - Validates credentials and returns user
 - `getUserById(id)` - Retrieves user by ID
@@ -312,22 +316,27 @@ describe('moduleName', () => {
 **Database**: Azure Cosmos DB (`users` container)
 
 **Error Handling**:
+
 - Throws `AppError` with `ErrorCode.NOT_FOUND` if user doesn't exist
 - Throws `AppError` with `ErrorCode.UNAUTHORIZED` for invalid credentials
 - Throws `AppError` with `ErrorCode.CONFLICT` for duplicate email
 
 **Example Usage**:
+
 ```typescript
 // In a function handler
 import { authenticateUser } from '../services/user.service.js';
 
 const user = await authenticateUser(body.email, body.password);
-const token = generateJwt({
-  sub: user.id,
-  email: user.email,
-  name: user.name,
-  role: user.role,
-}, process.env.JWT_SECRET!);
+const token = generateJwt(
+  {
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  },
+  process.env.JWT_SECRET!,
+);
 ```
 
 ---
@@ -339,22 +348,21 @@ const token = generateJwt({
 **Location**: `src/services/notification.service.ts`
 
 **Key Functions**:
+
 - `sendEmail(to, subject, body)` - Sends email via SendGrid
 - `sendSMS(phoneNumber, message)` - Sends SMS via Twilio
 
 **Configuration**:
+
 - Requires `SENDGRID_API_KEY` environment variable
 - Requires `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`
 
 **Example Usage**:
+
 ```typescript
 import { sendEmail } from '../services/notification.service.js';
 
-await sendEmail(
-  user.email,
-  'Welcome!',
-  'Thank you for signing up.'
-);
+await sendEmail(user.email, 'Welcome!', 'Thank you for signing up.');
 ```
 
 ---
@@ -366,14 +374,17 @@ await sendEmail(
 **Location**: `src/services/storage.service.ts`
 
 **Key Functions**:
+
 - `uploadFile(containerName, fileName, content)` - Uploads file to blob storage
 - `downloadFile(containerName, fileName)` - Downloads file from blob storage
 - `generateSasUrl(containerName, fileName, expiryMinutes)` - Generates temporary access URL
 
 **Configuration**:
+
 - Requires `AZURE_STORAGE_CONNECTION_STRING` environment variable
 
 **Example Usage**:
+
 ```typescript
 import { uploadFile } from '../services/storage.service.js';
 
@@ -386,11 +397,11 @@ const url = await uploadFile('uploads', 'document.pdf', fileBuffer);
 
 Document all required environment variables for your project:
 
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `JWT_SECRET` | Yes | Secret for JWT token generation | `your-super-secret-key-min-32-chars` |
-| `COSMOS_CONNECTION_STRING` | Yes | Azure Cosmos DB connection string | `AccountEndpoint=https://...` |
-| `AZURE_STORAGE_CONNECTION_STRING` | No | Azure Blob Storage (for file uploads) | `DefaultEndpointsProtocol=https...` |
+| Variable                          | Required | Description                           | Example                              |
+| --------------------------------- | -------- | ------------------------------------- | ------------------------------------ |
+| `JWT_SECRET`                      | Yes      | Secret for JWT token generation       | `your-super-secret-key-min-32-chars` |
+| `COSMOS_CONNECTION_STRING`        | Yes      | Azure Cosmos DB connection string     | `AccountEndpoint=https://...`        |
+| `AZURE_STORAGE_CONNECTION_STRING` | No       | Azure Blob Storage (for file uploads) | `DefaultEndpointsProtocol=https...`  |
 
 ---
 

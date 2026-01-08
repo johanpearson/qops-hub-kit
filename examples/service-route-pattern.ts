@@ -7,6 +7,7 @@
  * - OpenAPI documentation is auto-generated
  */
 
+import { randomUUID } from 'crypto';
 import { app } from '@azure/functions';
 import {
   RouteBuilder,
@@ -15,7 +16,6 @@ import {
   UserRole,
   AppError,
   ErrorCode,
-  createService,
   createRouteHandler,
 } from '@qops/hub-kit';
 
@@ -81,8 +81,7 @@ async function hashPassword(password: string): Promise<string> {
 /**
  * Create a new user
  */
-export const createUser = createService(
-  async (
+export async function createUser(
     input: z.infer<typeof createUserRequestSchema>,
     createdBy?: string
   ): Promise<UserResponse> => {
@@ -99,7 +98,7 @@ export const createUser = createService(
 
     // Create user
     const user: User = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       email: input.email,
       name: input.name,
       passwordHash,
@@ -123,8 +122,7 @@ export const createUser = createService(
 /**
  * Find user by email
  */
-export const findUserByEmail = createService(
-  async (email: string): Promise<User | undefined> => {
+export async function findUserByEmail(email: string): Promise<User | undefined> => {
     const userId = emailIndex.get(email);
     if (!userId) {
       return undefined;
@@ -136,8 +134,7 @@ export const findUserByEmail = createService(
 /**
  * Find user by ID
  */
-export const findUserById = createService(
-  async (id: string): Promise<UserResponse | undefined> => {
+export async function findUserById(id: string): Promise<UserResponse | undefined> => {
     const user = users.get(id);
     if (!user) {
       return undefined;
@@ -155,7 +152,7 @@ export const findUserById = createService(
 /**
  * List all users
  */
-export const listUsers = createService(async (): Promise<{
+export async function listUsers(): Promise<{
   users: UserResponse[];
   total: number;
 }> => {
@@ -170,7 +167,7 @@ export const listUsers = createService(async (): Promise<{
     users: userList,
     total: userList.length,
   };
-});
+}
 
 // ============================================================================
 // 3. Route Definitions (Schema + Handler)
@@ -220,7 +217,7 @@ routeBuilder
     requiresAuth: true,
     requiredRoles: [UserRole.MEMBER, UserRole.ADMIN],
     handler: async (request, context, { user }) => {
-      const result = await listUsers({}, user?.sub);
+      const result = await listUsers();
       return {
         status: 200,
         jsonBody: result,
@@ -238,7 +235,7 @@ routeBuilder
     requiredRoles: [UserRole.MEMBER, UserRole.ADMIN],
     handler: async (request, context, { user }) => {
       const userId = request.params.id;
-      const foundUser = await findUserById(userId, user?.sub);
+      const foundUser = await findUserById(userId);
 
       if (!foundUser) {
         throw new AppError(ErrorCode.NOT_FOUND, 'User not found');

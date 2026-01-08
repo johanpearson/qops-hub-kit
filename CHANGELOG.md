@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `RouteBuilder` - Service/route pattern support for clean separation of concerns
-- `createService` - Helper for wrapping service functions
 - `createRouteHandler` - Helper for creating route handlers from service functions
 - Example demonstrating service/route pattern (`examples/service-route-pattern.ts`)
 - Documentation for service/route pattern in README

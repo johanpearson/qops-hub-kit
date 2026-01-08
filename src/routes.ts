@@ -226,30 +226,6 @@ export class RouteBuilder {
 }
 
 /**
- * Create a service wrapper that handles errors consistently
- * 
- * @param serviceFn - Service function
- * @returns Wrapped service function
- * 
- * @example
- * ```typescript
- * export const createUser = createService(async (input: CreateUserInput, userId?: string) => {
- *   if (await userExists(input.email)) {
- *     throw new AppError(ErrorCode.CONFLICT, 'User already exists');
- *   }
- *   return await saveUser(input);
- * });
- * ```
- */
-export function createService<TInput, TOutput>(
-  serviceFn: ServiceFunction<TInput, TOutput>
-): ServiceFunction<TInput, TOutput> {
-  return async (input: TInput, userId?: string) => {
-    return await serviceFn(input, userId);
-  };
-}
-
-/**
  * Helper to create a simple route handler from a service function
  * 
  * @param serviceFn - Service function

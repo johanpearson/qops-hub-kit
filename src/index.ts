@@ -21,7 +21,6 @@ export {
   Route,
   RouteHandler,
   ServiceFunction,
-  createService,
   createRouteHandler,
 } from './routes';
 

@@ -147,23 +147,21 @@ For teams that prefer separating business logic from route definitions, the pack
 ### Define Services (Business Logic)
 
 ```typescript
-import { createService, AppError, ErrorCode } from '@qops/hub-kit';
+import { AppError, ErrorCode } from '@qops/hub-kit';
 
 // Service functions contain pure business logic
-export const createUser = createService(
-  async (input: CreateUserInput, userId?: string) => {
-    if (await userExists(input.email)) {
-      throw new AppError(ErrorCode.CONFLICT, 'User already exists');
-    }
-    
-    const user = await saveUser(input);
-    return user;
+export async function createUser(input: CreateUserInput): Promise<UserResponse> {
+  if (await userExists(input.email)) {
+    throw new AppError(ErrorCode.CONFLICT, 'User already exists');
   }
-);
+  
+  const user = await saveUser(input);
+  return user;
+}
 
-export const listUsers = createService(async () => {
+export async function listUsers() {
   return await fetchUsersFromDb();
-});
+}
 ```
 
 ### Define Routes (Schemas + Handlers)
@@ -529,7 +527,6 @@ builder.route({
 
 ### Helper Functions
 
-- `createService(serviceFn)`: Wrap a service function for consistent error handling
 - `createRouteHandler(serviceFn, options)`: Create a route handler from a service function
   - `options.successStatus`: HTTP status code (default: 200)
   - `options.passUser`: Pass user ID to service function (default: false)

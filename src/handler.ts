@@ -1,13 +1,13 @@
 import { HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import { AppError, ErrorCode } from './errors';
+import { AppError, ErrorCode } from './errors.js';
 import {
   getOrCreateCorrelationId,
   addCorrelationIdToContext,
   getCorrelationId,
   CORRELATION_ID_HEADER,
-} from './correlation';
-import { extractBearerToken, verifyToken, verifyRole, setAuthUser, JwtConfig, UserRole, JwtPayload } from './auth';
+} from './correlation.js';
+import { extractBearerToken, verifyToken, verifyRole, setAuthUser, JwtConfig, UserRole, JwtPayload } from './auth.js';
 
 /**
  * Handler function type

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { HttpRequest, InvocationContext, HttpResponseInit } from '@azure/functions';
-import { createHandler, HandlerConfig, ParsedRequest } from './handler';
-import { OpenApiBuilder, RouteDefinition, HttpMethod } from './openapi';
-import { UserRole } from './auth';
+import { createHandler, HandlerConfig, ParsedRequest } from './handler.js';
+import { OpenApiBuilder, RouteDefinition, HttpMethod } from './openapi.js';
+import { UserRole } from './auth.js';
 
 /**
  * Route handler function type - simplified handler that receives parsed data

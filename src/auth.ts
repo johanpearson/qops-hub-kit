@@ -1,6 +1,6 @@
 import { HttpRequest, InvocationContext } from '@azure/functions';
 import jwt from 'jsonwebtoken';
-import { createUnauthorizedError, createForbiddenError } from './errors';
+import { createUnauthorizedError, createForbiddenError } from './errors.js';
 
 /**
  * User roles for authorization

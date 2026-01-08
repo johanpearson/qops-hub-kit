@@ -8,10 +8,10 @@
  */
 
 // Core handler
-export { createHandler, HandlerConfig, HandlerFunction, ParsedRequest } from './handler';
+export { createHandler, HandlerConfig, HandlerFunction, ParsedRequest } from './handler.js';
 
 // Route builder (service/route pattern)
-export { RouteBuilder, Route, RouteHandler, ServiceFunction, createRouteHandler } from './routes';
+export { RouteBuilder, Route, RouteHandler, ServiceFunction, createRouteHandler } from './routes.js';
 
 // Error handling
 export {
@@ -22,7 +22,7 @@ export {
   createUnauthorizedError,
   createForbiddenError,
   createNotFoundError,
-} from './errors';
+} from './errors.js';
 
 // Authentication
 export {
@@ -34,7 +34,7 @@ export {
   verifyRole,
   getAuthUser,
   setAuthUser,
-} from './auth';
+} from './auth.js';
 
 // Correlation ID
 export {
@@ -42,7 +42,7 @@ export {
   getOrCreateCorrelationId,
   addCorrelationIdToContext,
   getCorrelationId,
-} from './correlation';
+} from './correlation.js';
 
 // OpenAPI documentation
-export { OpenApiBuilder, OpenApiConfig, RouteDefinition, HttpMethod, z } from './openapi';
+export { OpenApiBuilder, OpenApiConfig, RouteDefinition, HttpMethod, z } from './openapi.js';

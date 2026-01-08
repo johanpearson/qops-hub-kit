@@ -262,21 +262,20 @@ Creates an Azure Function handler with built-in middleware.
   - `algorithms`: Allowed algorithms (default: `['HS256']`)
 - `requiredRoles`: Array of required roles (`UserRole.MEMBER` | `UserRole.ADMIN`)
 - `enableLogging`: Enable request/response logging
-- `skipBodyParsing`: Skip automatic JSON parsing (useful for file uploads)
 
 **Handler receives:**
 
 - `request`: Azure Functions `HttpRequest`
 - `context`: Azure Functions `InvocationContext`
 - `parsedData`: Object containing:
-  - `body`: Validated request body
-  - `query`: Validated query parameters
+  - `body`: Validated request body (only if `bodySchema` provided)
+  - `query`: Validated query parameters (only if `querySchema` provided)
   - `user`: Authenticated user (contains `sub`, `email`, `name`, `role`)
   - `correlationId`: Request correlation ID
 
 ### File Uploads
 
-Handle file uploads by skipping automatic body parsing:
+Handle file uploads by not specifying a `bodySchema`, which allows manual body parsing:
 
 ```typescript
 import { createHandler, UserRole } from '@qops/hub-kit';
@@ -302,7 +301,8 @@ export default createHandler(
   {
     jwtConfig: { secret: process.env.JWT_SECRET! },
     requiredRoles: [UserRole.MEMBER],
-    skipBodyParsing: true, // Important for file uploads
+    // Note: No bodySchema specified, so body won't be automatically parsed
+    // This allows us to manually handle the request body for file uploads
   },
 );
 ```

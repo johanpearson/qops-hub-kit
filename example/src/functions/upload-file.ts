@@ -9,7 +9,10 @@ await initializeStorage();
  *
  * POST /api/files/upload
  *
- * Demonstrates how to handle file uploads with Azure Functions.
+ * Demonstrates how to handle file uploads with Azure Functions and @qops/hub-kit.
+ *
+ * Since we don't specify a bodySchema, the handler won't automatically parse the body as JSON,
+ * allowing us to manually handle both JSON (with base64) and binary uploads.
  *
  * In production, you would typically:
  * 1. Parse multipart/form-data using a library or Azure Functions binding
@@ -20,9 +23,9 @@ await initializeStorage();
  *
  * Note: Azure Functions v4 doesn't have built-in multipart parsing.
  * For production use, consider:
- * - Accepting base64-encoded files in JSON
+ * - Accepting base64-encoded files in JSON (shown here)
  * - Using blob storage input/output bindings
- * - Using Azure Functions with custom middleware for parsing
+ * - Using a custom body parser library
  */
 export default createHandler(
   async (request, _context, { user }) => {
@@ -101,7 +104,8 @@ export default createHandler(
       secret: process.env.JWT_SECRET || 'your-secret-key-change-this-in-production',
     },
     requiredRoles: [UserRole.MEMBER, UserRole.ADMIN],
-    skipBodyParsing: true, // Don't auto-parse as JSON
     enableLogging: true,
+    // Note: We don't use bodySchema here since we manually parse
+    // the request body to support both JSON and binary uploads
   },
 );

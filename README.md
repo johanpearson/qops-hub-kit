@@ -308,7 +308,125 @@ app.http('listUsers', {
 });
 ```
 
-### 7. Test Your API
+### 7. OpenAPI Documentation (Optional)
+
+Add an OpenAPI endpoint to document your API:
+
+**src/functions/openapi.ts**
+```typescript
+import { app } from '@azure/functions';
+import { OpenApiBuilder } from '@qops/hub-kit';
+import { z } from 'zod';
+
+// Define your schemas
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+const userResponseSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  name: z.string(),
+  role: z.enum(['admin', 'member']),
+});
+
+const loginResponseSchema = z.object({
+  token: z.string(),
+  user: userResponseSchema,
+});
+
+const usersListSchema = z.object({
+  users: z.array(userResponseSchema),
+  total: z.number(),
+});
+
+// Build OpenAPI documentation
+const builder = new OpenApiBuilder({
+  title: 'My API',
+  version: '1.0.0',
+  description: 'Azure Functions API with JWT authentication',
+});
+
+builder.registerRoute({
+  method: 'POST',
+  path: '/api/auth/login',
+  summary: 'User login',
+  description: 'Authenticate user and return JWT token',
+  tags: ['Authentication'],
+  requestBody: loginSchema,
+  responses: {
+    200: {
+      description: 'Login successful',
+      schema: loginResponseSchema,
+    },
+    401: {
+      description: 'Invalid credentials',
+    },
+  },
+  requiresAuth: false,
+});
+
+builder.registerRoute({
+  method: 'GET',
+  path: '/api/users/{id}',
+  summary: 'Get user by ID',
+  description: 'Retrieve a user by their ID',
+  tags: ['Users'],
+  parameters: [
+    {
+      name: 'id',
+      in: 'path',
+      required: true,
+      schema: z.string(),
+      description: 'User ID',
+    },
+  ],
+  responses: {
+    200: {
+      description: 'User found',
+      schema: userResponseSchema,
+    },
+    404: {
+      description: 'User not found',
+    },
+  },
+  requiresAuth: true,
+});
+
+builder.registerRoute({
+  method: 'GET',
+  path: '/api/users',
+  summary: 'List all users',
+  description: 'Retrieve all users',
+  tags: ['Users'],
+  responses: {
+    200: {
+      description: 'List of users',
+      schema: usersListSchema,
+    },
+  },
+  requiresAuth: true,
+});
+
+// Generate and serve OpenAPI document
+app.http('openapi', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'openapi.json',
+  handler: async (request, context) => {
+    return {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      jsonBody: builder.generateDocument(),
+    };
+  },
+});
+```
+
+You can now access your API documentation at `http://localhost:7071/api/openapi.json` and use it with tools like Swagger UI or Postman.
+
+### 8. Test Your API
 
 ```bash
 # Build

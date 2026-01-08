@@ -15,6 +15,16 @@ export {
   ParsedRequest,
 } from './handler';
 
+// Route builder (service/route pattern)
+export {
+  RouteBuilder,
+  Route,
+  RouteHandler,
+  ServiceFunction,
+  createService,
+  createRouteHandler,
+} from './routes';
+
 // Error handling
 export {
   AppError,

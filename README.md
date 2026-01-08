@@ -140,6 +140,121 @@ const handler = createHandler(
 );
 ```
 
+## Service/Route Pattern (Alternative Approach)
+
+For teams that prefer separating business logic from route definitions, the package provides a `RouteBuilder` that supports the service/route pattern:
+
+### Define Services (Business Logic)
+
+```typescript
+import { createService, AppError, ErrorCode } from '@qops/hub-kit';
+
+// Service functions contain pure business logic
+export const createUser = createService(
+  async (input: CreateUserInput, userId?: string) => {
+    if (await userExists(input.email)) {
+      throw new AppError(ErrorCode.CONFLICT, 'User already exists');
+    }
+    
+    const user = await saveUser(input);
+    return user;
+  }
+);
+
+export const listUsers = createService(async () => {
+  return await fetchUsersFromDb();
+});
+```
+
+### Define Routes (Schemas + Handlers)
+
+```typescript
+import { RouteBuilder, OpenApiBuilder, z, UserRole, createRouteHandler } from '@qops/hub-kit';
+
+// Setup
+const openApiBuilder = new OpenApiBuilder({ title: 'My API', version: '1.0.0' });
+const routeBuilder = new RouteBuilder(openApiBuilder);
+
+// Define schemas
+const createUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1),
+});
+
+const userResponseSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  name: z.string(),
+});
+
+// Define routes - schemas and OpenAPI docs auto-generated
+routeBuilder
+  .route({
+    method: 'POST',
+    path: '/api/users',
+    summary: 'Create a new user',
+    tags: ['Users'],
+    bodySchema: createUserSchema,
+    responseSchema: userResponseSchema,
+    requiresAuth: true,
+    requiredRoles: [UserRole.ADMIN],
+    successStatus: 201,
+    handler: createRouteHandler(createUser, {
+      successStatus: 201,
+      passUser: true,
+    }),
+  })
+  .route({
+    method: 'GET',
+    path: '/api/users',
+    summary: 'List all users',
+    tags: ['Users'],
+    responseSchema: z.object({ users: z.array(userResponseSchema) }),
+    requiresAuth: true,
+    handler: async (req, ctx, { user }) => {
+      const users = await listUsers({}, user?.sub);
+      return { status: 200, jsonBody: users };
+    },
+  });
+```
+
+### Register with Azure Functions
+
+```typescript
+import { app } from '@azure/functions';
+
+// Auto-register all routes
+for (const route of routeBuilder.getAllRoutes()) {
+  const functionName = `${route.method.toLowerCase()}_${route.path.replace(/\//g, '_')}`;
+  
+  app.http(functionName, {
+    methods: [route.method],
+    authLevel: 'anonymous',
+    route: route.path.replace('/api/', ''),
+    handler: routeBuilder.createAzureHandler(route),
+  });
+}
+
+// Serve OpenAPI docs
+app.http('openapi', {
+  methods: ['GET'],
+  route: 'openapi.json',
+  handler: async () => ({
+    status: 200,
+    jsonBody: openApiBuilder.generateDocument(),
+  }),
+});
+```
+
+**Benefits of Service/Route Pattern:**
+- ✅ Clean separation of concerns (business logic vs. API layer)
+- ✅ Services are reusable and testable independently
+- ✅ Routes define schemas and OpenAPI documentation in one place
+- ✅ Auto-registration reduces boilerplate
+- ✅ Type-safe with full IntelliSense support
+
+See `examples/service-route-pattern.ts` for a complete working example.
+
 ## OpenAPI Documentation
 
 Generate OpenAPI v3 documentation from your route definitions:
@@ -367,6 +482,57 @@ Creates an Azure Function handler with built-in middleware.
   - `enableLogging`: Enable request/response logging (default: `false`)
 
 **Returns:** Azure Function handler
+
+### `RouteBuilder`
+
+A builder for defining routes with schemas and automatic OpenAPI registration.
+
+**Constructor:**
+- `new RouteBuilder(openApiBuilder?)`: Create a route builder with optional OpenAPI integration
+
+**Methods:**
+
+- `route(config)`: Define a route
+  - `method`: HTTP method ('GET', 'POST', 'PUT', 'PATCH', 'DELETE')
+  - `path`: Route path (e.g., '/api/users')
+  - `summary`: Short description for OpenAPI
+  - `description`: Detailed description (optional)
+  - `tags`: Array of tags for OpenAPI grouping (optional)
+  - `bodySchema`: Zod schema for request body validation
+  - `querySchema`: Zod schema for query parameters
+  - `responseSchema`: Zod schema for success response
+  - `successStatus`: HTTP status code for success (default: 200, or 201 for POST)
+  - `requiresAuth`: Whether authentication is required
+  - `requiredRoles`: Array of required roles
+  - `handler`: Route handler function
+- `getAllRoutes()`: Get all registered routes
+- `getRoute(method, path)`: Get a specific route
+- `createAzureHandler(route)`: Create an Azure Function handler for a route
+
+**Example:**
+
+```typescript
+const builder = new RouteBuilder(openApiBuilder);
+builder.route({
+  method: 'POST',
+  path: '/api/users',
+  summary: 'Create user',
+  bodySchema: createUserSchema,
+  responseSchema: userResponseSchema,
+  requiresAuth: true,
+  handler: async (req, ctx, { body, user }) => {
+    const user = await createUser(body);
+    return { status: 201, jsonBody: user };
+  },
+});
+```
+
+### Helper Functions
+
+- `createService(serviceFn)`: Wrap a service function for consistent error handling
+- `createRouteHandler(serviceFn, options)`: Create a route handler from a service function
+  - `options.successStatus`: HTTP status code (default: 200)
+  - `options.passUser`: Pass user ID to service function (default: false)
 
 ### Error Types
 

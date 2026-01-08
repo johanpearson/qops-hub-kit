@@ -46,3 +46,6 @@ export {
 
 // OpenAPI documentation
 export { OpenApiBuilder, OpenApiConfig, RouteDefinition, HttpMethod, z } from './openapi.js';
+
+// Health check
+export { createHealthHandler, HealthCheckResponse } from './health.js';

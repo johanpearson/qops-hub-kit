@@ -36,6 +36,8 @@ my-api/
 ├── host.json                       # Azure Functions configuration
 ├── local.settings.json             # Environment variables (local)
 ├── src/
+│   ├── schemas/                    # Shared Zod schemas (reused in functions & OpenAPI)
+│   │   └── user.schemas.ts
 │   ├── services/                   # Business logic
 │   │   └── user.service.ts
 │   └── functions/                  # Azure Function handlers
@@ -116,7 +118,43 @@ my-api/
 }
 ```
 
-## 5. Service Layer (Business Logic)
+## 5. Shared Schemas (Avoid Duplication)
+
+**Best Practice:** Define Zod schemas in a shared location to reuse them in both function handlers and OpenAPI documentation.
+
+**src/schemas/user.schemas.ts**
+
+```typescript
+import { z } from '@qops/hub-kit';
+
+// Login request schema
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+// User response schema
+export const userResponseSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  name: z.string(),
+  role: z.enum(['admin', 'member']),
+});
+
+// Login response schema
+export const loginResponseSchema = z.object({
+  token: z.string(),
+  user: userResponseSchema,
+});
+
+// Users list schema
+export const usersListSchema = z.object({
+  users: z.array(userResponseSchema),
+  total: z.number(),
+});
+```
+
+## 6. Service Layer (Business Logic)
 
 **src/services/user.service.ts**
 
@@ -197,7 +235,7 @@ export async function getAllUsers(): Promise<UserResponse[]> {
 }
 ```
 
-## 6. Function Handlers
+## 7. Function Handlers
 
 ### Health Check Endpoint
 
@@ -222,14 +260,10 @@ app.http('health', {
 
 ```typescript
 import { app } from '@azure/functions';
-import { createHandler, z } from '@qops/hub-kit';
+import { createHandler } from '@qops/hub-kit';
 import jwt from 'jsonwebtoken';
 import { authenticateUser } from '../services/user.service.js';
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
+import { loginSchema } from '../schemas/user.schemas.js';
 
 const loginHandler = createHandler(
   async (request, context, { body }) => {
@@ -330,38 +364,16 @@ app.http('listUsers', {
 });
 ```
 
-## 7. OpenAPI Documentation
+## 8. OpenAPI Documentation
 
-Add an OpenAPI endpoint to document your API:
+**Best Practice:** Reuse the shared schemas to document your API - no duplication needed!
 
 **src/functions/openapi.ts**
 
 ```typescript
 import { app } from '@azure/functions';
-import { OpenApiBuilder, healthCheckResponseSchema, z } from '@qops/hub-kit';
-
-// Define your schemas
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
-
-const userResponseSchema = z.object({
-  id: z.string(),
-  email: z.string(),
-  name: z.string(),
-  role: z.enum(['admin', 'member']),
-});
-
-const loginResponseSchema = z.object({
-  token: z.string(),
-  user: userResponseSchema,
-});
-
-const usersListSchema = z.object({
-  users: z.array(userResponseSchema),
-  total: z.number(),
-});
+import { OpenApiBuilder, healthCheckResponseSchema } from '@qops/hub-kit';
+import { loginSchema, loginResponseSchema, userResponseSchema, usersListSchema } from '../schemas/user.schemas.js';
 
 // Build OpenAPI documentation
 const builder = new OpenApiBuilder({
@@ -370,7 +382,7 @@ const builder = new OpenApiBuilder({
   description: 'Azure Functions API with JWT authentication',
 });
 
-// Register all routes
+// Register all routes using shared schemas
 builder.registerRoute({
   method: 'GET',
   path: '/api/health',
@@ -462,7 +474,7 @@ app.http('openapi', {
 });
 ```
 
-## 8. Test Your API
+## 9. Test Your API
 
 ```bash
 # Build
@@ -491,7 +503,7 @@ curl http://localhost:7071/api/users \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
-## 9. View API Documentation
+## 10. View API Documentation
 
 You can use Swagger UI to visualize your OpenAPI specification:
 

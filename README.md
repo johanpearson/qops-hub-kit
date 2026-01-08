@@ -23,21 +23,56 @@ npm install @qops/hub-kit zod jsonwebtoken @azure/functions
 npm install -D @types/jsonwebtoken typescript
 ```
 
+### Recommended Project Structure
+
+```
+my-api/
+├── src/
+│   ├── schemas/               # Shared Zod schemas (reused in functions & OpenAPI)
+│   │   └── user.schemas.ts
+│   ├── services/              # Business logic
+│   │   └── user.service.ts
+│   └── functions/             # Azure Function handlers
+│       ├── openapi.ts         # OpenAPI documentation endpoint
+│       ├── create-user.ts     # Create user handler
+│       └── get-user.ts        # Get user handler
+├── package.json
+├── tsconfig.json
+└── host.json
+```
+
 ### Basic Example with OpenAPI
 
-Create a simple API with authentication and OpenAPI documentation:
+Create a simple API with authentication and OpenAPI documentation.
 
-**1. Create a handler with validation:**
+**Best Practice: Define schemas once in a shared location to avoid duplication.**
+
+**1. Define shared schemas:**
 
 ```typescript
-// functions/create-user.ts
-import { app } from '@azure/functions';
-import { createHandler, UserRole, z } from '@qops/hub-kit';
+// src/schemas/user.schemas.ts
+import { z } from '@qops/hub-kit';
 
-const createUserSchema = z.object({
+export const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
 });
+
+export const userResponseSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  name: z.string(),
+  role: z.enum(['admin', 'member']),
+});
+```
+
+**2. Create handler that uses the schema:**
+
+```typescript
+// src/functions/create-user.ts
+import { app } from '@azure/functions';
+import { createHandler, UserRole } from '@qops/hub-kit';
+import { createUserSchema } from '../schemas/user.schemas.js';
 
 const handler = createHandler(
   async (request, context, { body, user }) => {
@@ -61,24 +96,13 @@ app.http('createUser', {
 });
 ```
 
-**2. Add OpenAPI documentation:**
+**3. Add OpenAPI documentation using the same schemas:**
 
 ```typescript
-// functions/openapi.ts
+// src/functions/openapi.ts
 import { app } from '@azure/functions';
-import { OpenApiBuilder, z } from '@qops/hub-kit';
-
-const createUserSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1),
-});
-
-const userResponseSchema = z.object({
-  id: z.string(),
-  email: z.string(),
-  name: z.string(),
-  role: z.enum(['admin', 'member']),
-});
+import { OpenApiBuilder } from '@qops/hub-kit';
+import { createUserSchema, userResponseSchema } from '../schemas/user.schemas.js';
 
 const builder = new OpenApiBuilder({
   title: 'My API',
@@ -86,6 +110,7 @@ const builder = new OpenApiBuilder({
   description: 'Azure Functions API with JWT authentication',
 });
 
+// Reuse the same schemas - no duplication!
 builder.registerRoute({
   method: 'POST',
   path: '/api/users',
@@ -112,7 +137,7 @@ app.http('openapi', {
 });
 ```
 
-**3. Test your API:**
+**4. Test your API:**
 
 ```bash
 # Build and run

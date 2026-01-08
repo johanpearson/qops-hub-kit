@@ -1,0 +1,183 @@
+name: Publish Package
+
+# Manual trigger only
+trigger: none
+
+# Manual trigger with version bump parameter
+parameters:
+  - name: versionBump
+    displayName: 'Version Bump Type'
+    type: string
+    default: 'patch'
+    values:
+      - patch
+      - minor
+      - major
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  nodeVersion: '18.x'
+  artifactFeedName: 'qops-feed' # Update this to match your Azure Artifacts feed name
+
+stages:
+  - stage: Version
+    displayName: 'Version and Build'
+    jobs:
+      - job: VersionBump
+        displayName: 'Bump Version and Build'
+        steps:
+          - task: NodeTool@0
+            displayName: 'Use Node.js $(nodeVersion)'
+            inputs:
+              versionSpec: '$(nodeVersion)'
+
+          - task: Npm@1
+            displayName: 'Install dependencies'
+            inputs:
+              command: 'ci'
+              workingDir: '$(Build.SourcesDirectory)'
+
+          - bash: |
+              git config user.email "azure-pipelines@qops.com"
+              git config user.name "Azure Pipelines"
+            displayName: 'Configure Git'
+
+          - bash: |
+              # Bump version based on parameter
+              npm version ${{ parameters.versionBump }} --no-git-tag-version
+              
+              # Get the new version
+              NEW_VERSION=$(node -p "require('./package.json').version")
+              echo "New version: $NEW_VERSION"
+              
+              # Set as pipeline variable
+              echo "##vso[task.setvariable variable=PackageVersion;isOutput=true]$NEW_VERSION"
+              
+              # Commit the version change
+              git add package.json package-lock.json
+              git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+            displayName: 'Bump package version'
+            name: versionStep
+
+          - task: Npm@1
+            displayName: 'Run linting'
+            inputs:
+              command: 'custom'
+              customCommand: 'run lint'
+              workingDir: '$(Build.SourcesDirectory)'
+
+          - task: Npm@1
+            displayName: 'Build TypeScript'
+            inputs:
+              command: 'custom'
+              customCommand: 'run build'
+              workingDir: '$(Build.SourcesDirectory)'
+
+          - task: Npm@1
+            displayName: 'Run tests'
+            inputs:
+              command: 'custom'
+              customCommand: 'test'
+              workingDir: '$(Build.SourcesDirectory)'
+
+          - bash: |
+              git push origin HEAD:$(Build.SourceBranchName)
+            displayName: 'Push version commit'
+            condition: succeeded()
+
+          - task: CopyFiles@2
+            displayName: 'Copy package files'
+            inputs:
+              contents: |
+                package.json
+                package-lock.json
+                dist/**
+                README.md
+                LICENSE
+              targetFolder: '$(Build.ArtifactStagingDirectory)'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish build artifacts'
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)'
+              artifactName: 'package'
+              publishLocation: 'Container'
+
+  - stage: Publish
+    displayName: 'Publish to Azure Artifacts'
+    dependsOn: Version
+    condition: succeeded()
+    jobs:
+      - job: PublishPackage
+        displayName: 'Publish npm package'
+        variables:
+          PackageVersion: $[ stageDependencies.Version.VersionBump.outputs['versionStep.PackageVersion'] ]
+        steps:
+          - checkout: none
+
+          - task: DownloadBuildArtifacts@1
+            displayName: 'Download build artifacts'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'package'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: NodeTool@0
+            displayName: 'Use Node.js $(nodeVersion)'
+            inputs:
+              versionSpec: '$(nodeVersion)'
+
+          - task: Npm@1
+            displayName: 'Authenticate with Azure Artifacts'
+            inputs:
+              command: 'custom'
+              customCommand: 'config set registry https://pkgs.dev.azure.com/$(System.TeamFoundationCollectionUri)/_packaging/$(artifactFeedName)/npm/registry/'
+              workingDir: '$(System.ArtifactsDirectory)/package'
+
+          - task: npmAuthenticate@0
+            displayName: 'npm Authenticate'
+            inputs:
+              workingFile: '$(System.ArtifactsDirectory)/package/.npmrc'
+
+          - task: Npm@1
+            displayName: 'Publish package to Azure Artifacts'
+            inputs:
+              command: 'publish'
+              workingDir: '$(System.ArtifactsDirectory)/package'
+              publishRegistry: 'useFeed'
+              publishFeed: '$(artifactFeedName)'
+
+          - bash: |
+              echo "##vso[task.complete result=Succeeded;]Package version $(PackageVersion) published successfully to Azure Artifacts feed: $(artifactFeedName)"
+            displayName: 'Publish success message'
+            condition: succeeded()
+
+  - stage: CreateTag
+    displayName: 'Create Git Tag'
+    dependsOn:
+      - Version
+      - Publish
+    condition: succeeded()
+    jobs:
+      - job: TagRelease
+        displayName: 'Tag release in Git'
+        variables:
+          PackageVersion: $[ stageDependencies.Version.VersionBump.outputs['versionStep.PackageVersion'] ]
+        steps:
+          - checkout: self
+            persistCredentials: true
+
+          - bash: |
+              git config user.email "azure-pipelines@qops.com"
+              git config user.name "Azure Pipelines"
+              
+              # Create and push tag
+              git tag -a "v$(PackageVersion)" -m "Release version $(PackageVersion)"
+              git push origin "v$(PackageVersion)"
+              
+              echo "Created and pushed tag v$(PackageVersion)"
+            displayName: 'Create and push Git tag'
+            condition: succeeded()

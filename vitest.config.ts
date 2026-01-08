@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
+      reporter: ['text', 'json', 'html', 'lcov', 'cobertura'],
       exclude: ['node_modules/**', 'dist/**', '**/*.test.ts', '**/*.config.ts', '**/*.config.js'],
       include: ['src/**/*.ts'],
       all: true,
@@ -14,6 +14,10 @@ export default defineConfig({
       functions: 80,
       branches: 80,
       statements: 80,
+    },
+    reporters: ['default', 'junit'],
+    outputFile: {
+      junit: './junit.xml',
     },
   },
 });

@@ -69,12 +69,14 @@ Choose the appropriate version bump based on your changes:
 ### Patch Release (1.0.0 → 1.0.1)
 
 **Use for:**
+
 - Bug fixes
 - Documentation updates
 - Minor internal improvements
 - Security patches
 
 **Command:**
+
 ```bash
 npm version patch --no-git-tag-version
 ```
@@ -82,12 +84,14 @@ npm version patch --no-git-tag-version
 ### Minor Release (1.0.0 → 1.1.0)
 
 **Use for:**
+
 - New features (backwards compatible)
 - New functionality
 - Enhancements to existing features
 - Deprecating features (not removing)
 
 **Command:**
+
 ```bash
 npm version minor --no-git-tag-version
 ```
@@ -95,12 +99,14 @@ npm version minor --no-git-tag-version
 ### Major Release (1.0.0 → 2.0.0)
 
 **Use for:**
+
 - Breaking changes
 - Removing deprecated features
 - Changing public APIs
 - Major architectural changes
 
 **Command:**
+
 ```bash
 npm version major --no-git-tag-version
 ```
@@ -155,6 +161,7 @@ git push origin hotfix/fix-critical-issue
 **Triggers:** PR to any branch, pushes to `main`
 
 **Actions:**
+
 - Install dependencies
 - Type check
 - Build
@@ -166,11 +173,13 @@ git push origin hotfix/fix-critical-issue
 **Triggers:** Pushes to `main` that modify `package.json`
 
 **Actions:**
+
 - Compare version in `package.json` to latest git tag
 - If version changed, create new tag (e.g., `v1.2.3`)
 - Push tag to repository
 
 **Requirements:**
+
 - Build service needs "Contribute" permission on repository
 
 ### 3. Publish Pipeline (`azure-pipelines-publish.yml`)
@@ -178,12 +187,14 @@ git push origin hotfix/fix-critical-issue
 **Triggers:** Tags matching `v*.*.*` from `main` or `hotfix/*` branches
 
 **Actions:**
+
 - Type check
 - Build
 - Run tests
 - Publish to Azure Artifacts feed
 
 **Requirements:**
+
 - Build service needs "Contributor" role on Artifacts feed
 
 ## Troubleshooting
@@ -191,11 +202,13 @@ git push origin hotfix/fix-critical-issue
 ### Auto-tag pipeline doesn't create tag
 
 **Check:**
+
 1. Version in `package.json` is different from latest tag
 2. `package.json` was modified in the commit
 3. Build service has "Contribute" permission on repository
 
 **How to fix:**
+
 ```bash
 # Check latest tag
 git describe --tags --abbrev=0
@@ -209,6 +222,7 @@ node -p "require('./package.json').version"
 ### Publish pipeline doesn't trigger
 
 **Check:**
+
 1. Tag format is correct (e.g., `v1.2.3`, not `1.2.3`)
 2. Tag was created from `main` or `hotfix/*` branch
 3. Publish pipeline is enabled in Azure DevOps
@@ -217,6 +231,7 @@ node -p "require('./package.json').version"
 
 **Solution:**
 Create a new PR with a higher version number:
+
 ```bash
 npm version patch --no-git-tag-version  # or minor, major
 git add package.json package-lock.json
@@ -226,6 +241,7 @@ git commit -m "chore: bump to next version"
 ### Tests fail in pipeline
 
 **Solution:**
+
 1. Run tests locally: `npm test`
 2. Fix any failing tests
 3. Push fixes to PR branch
@@ -236,6 +252,7 @@ git commit -m "chore: bump to next version"
 If you need to manually create a tag (e.g., auto-tag pipeline is broken):
 
 **Via Azure DevOps Web UI:**
+
 1. Navigate to Repos → Tags
 2. Click "New tag"
 3. Enter tag name (e.g., `v1.2.3`)
@@ -306,6 +323,7 @@ A: Typically 5-10 minutes after PR merge (auto-tag + publish pipelines).
 ## Support
 
 For issues with the release process:
+
 1. Check Azure DevOps pipeline logs
 2. Review troubleshooting section above
 3. Contact the repository maintainers

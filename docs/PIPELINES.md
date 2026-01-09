@@ -14,6 +14,7 @@ This project follows a **trunk-based development** workflow:
 ## Protected Branch Workflow
 
 Since the `main` branch is protected, we use an **automatic tagging pipeline** that:
+
 1. Triggers after merges to `main`
 2. Detects version changes in `package.json`
 3. Automatically creates and pushes tags (using pipeline credentials)
@@ -59,6 +60,7 @@ Developer → Update version in package.json → Create PR → Merge to main
 5. Save and run
 
 **Important:** Ensure the build service has permission to push tags:
+
 - Go to Project Settings → Repositories → Security
 - Find your build service account (e.g., `[Project Name] Build Service`)
 - Grant "Contribute" permission (allows tag creation)
@@ -236,6 +238,7 @@ git push origin hotfix/fix-critical-bug
 - `2.0.0` - Major release (breaking changes)
 
 ✅ **Key Benefits:**
+
 - No need to push tags manually
 - Works with protected branches
 - Follows standard PR workflow
@@ -280,11 +283,13 @@ npm install @qops/hub-kit@latest
 ### Auto-Tag Pipeline Issues
 
 **Pipeline doesn't create tag:**
+
 - Ensure version in `package.json` is different from latest git tag
 - Check that `package.json` was modified in the commit to main
 - Verify Build Service has "Contribute" permission on repository (needed to push tags)
 
 **Tags not triggering publish pipeline:**
+
 - Verify publish pipeline is set up and enabled
 - Check that tag format matches `v*.*.*` pattern (e.g., `v1.2.3`)
 - Ensure tag was created from `main` or `hotfix/*` branch

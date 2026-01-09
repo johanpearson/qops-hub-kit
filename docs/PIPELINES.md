@@ -1,6 +1,6 @@
 # Azure Pipelines
 
-This repository includes two Azure Pipeline configurations for CI/CD automation using a **trunk-based workflow**.
+This repository includes three Azure Pipeline configurations for CI/CD automation using a **trunk-based workflow**.
 
 ## Branching Strategy
 
@@ -42,6 +42,107 @@ Automatically validates code quality on every pull request and push to main bran
 3. Choose "Existing Azure Pipelines YAML file"
 4. Select `/azure-pipelines-ci.yml`
 5. Save and run
+
+---
+
+## Release Pipeline - Create Release Branch (Manual)
+
+**File:** `azure-pipelines-release.yml`
+
+### Purpose
+
+Provides a simple manual way to create release branches with automatic version bumping. This pipeline allows you to select the version type (patch, minor, or major) and creates a release branch from main with the updated version.
+
+### What it does
+
+1. ✅ Prompts for version type selection (patch, minor, or major)
+2. ✅ Checks out main branch
+3. ✅ Bumps version in package.json and package-lock.json using `npm version`
+4. ✅ Creates a release branch named `release/<version>`
+5. ✅ Commits the version changes
+6. ✅ Pushes the release branch to remote
+7. ✅ Displays summary with next steps
+
+### Triggers
+
+- **Manual only** - Must be triggered manually from Azure DevOps UI
+- **No automatic triggers** - Not triggered by commits or tags
+
+### Setup
+
+#### 1. Set up Pipeline in Azure DevOps
+
+1. Navigate to Azure DevOps → Pipelines → Create Pipeline
+2. Select your repository
+3. Choose "Existing Azure Pipelines YAML file"
+4. Select `/azure-pipelines-release.yml`
+5. Save
+
+#### 2. Configure Permissions
+
+The pipeline needs permission to push branches to the repository.
+
+**Enable branch push:**
+
+1. Go to Project Settings → Repositories → Your Repository → Security
+2. Find "Build Service" account (e.g., `[Project Name] Build Service`)
+3. Set "Contribute" to "Allow"
+4. Set "Create branch" to "Allow"
+
+### How to Use
+
+1. Navigate to Azure DevOps → Pipelines
+2. Find "Create Release Branch" pipeline
+3. Click "Run pipeline"
+4. Select version bump type from dropdown:
+   - **patch**: For bug fixes (1.0.0 → 1.0.1)
+   - **minor**: For new features (1.0.0 → 1.1.0)
+   - **major**: For breaking changes (1.0.0 → 2.0.0)
+5. Click "Run"
+
+The pipeline will:
+- Create a release branch like `release/1.0.1`
+- Update package.json and package-lock.json with the new version
+- Push the branch to remote
+
+### Next Steps After Release Branch Creation
+
+Once the release branch is created, you can:
+
+1. **Review the changes** in the release branch
+2. **Create a PR** if you want to review before publishing
+3. **Tag the release branch** to trigger the publish pipeline:
+   ```bash
+   git checkout release/1.0.1
+   git tag -a v1.0.1 -m "Release v1.0.1"
+   git push origin v1.0.1
+   ```
+4. **Merge back to main** after successful publish (optional but recommended)
+
+### Example Workflow
+
+```bash
+# Option 1: Use the manual pipeline (recommended)
+# 1. Trigger "Create Release Branch" pipeline in Azure DevOps UI
+# 2. Select "patch", "minor", or "major"
+# 3. Wait for completion
+# 4. Tag the release branch to publish:
+git fetch
+git checkout release/1.0.1
+git tag -a v1.0.1 -m "Release v1.0.1"
+git push origin v1.0.1
+
+# Option 2: Create release branch manually (alternative)
+git checkout main
+git pull
+git checkout -b release/1.0.1
+npm version 1.0.1 --no-git-tag-version
+git add package.json package-lock.json
+git commit -m "chore: bump version to 1.0.1"
+git push origin release/1.0.1
+git tag -a v1.0.1 -m "Release v1.0.1"
+git push origin v1.0.1
+```
 
 ---
 
@@ -199,6 +300,11 @@ git push origin main --follow-tags
 
 - `nodeVersion`: Node.js version to use (default: 18.x)
 
+### Release Pipeline
+
+- `nodeVersion`: Node.js version to use (default: 18.x)
+- `versionType`: Parameter selected when running the pipeline (patch, minor, or major)
+
 ### Publish Pipeline
 
 - `nodeVersion`: Node.js version to use (default: 18.x)
@@ -234,14 +340,16 @@ git push origin main --follow-tags
 
 ## Best Practices
 
-1. **Always run CI before publishing** - Ensure CI pipeline passes on your branch first
-2. **Use semantic versioning** - Choose the right version bump:
+1. **Use the Release Pipeline for version management** - The manual release pipeline ensures version consistency
+2. **Always run CI before publishing** - Ensure CI pipeline passes on your branch first
+3. **Use semantic versioning** - Choose the right version bump:
    - patch: Bug fixes, documentation updates
    - minor: New features, backwards compatible
    - major: Breaking changes
-3. **Review changes** - Check what's being published before triggering the pipeline
-4. **Test locally** - Run `npm run build && npm test` before publishing
-5. **Update changelog** - Document changes in commits or CHANGELOG.md
+4. **Review changes** - Check what's being published before triggering the pipeline
+5. **Test locally** - Run `npm run build && npm test` before creating releases
+6. **Update changelog** - Document changes in commits or CHANGELOG.md
+7. **Merge release branches back to main** - Keep main branch in sync with published versions
 
 ---
 

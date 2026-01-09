@@ -2,6 +2,21 @@
 
 A lightweight utility package for creating Azure Function v4 APIs with TypeScript. Eliminates boilerplate for JWT authentication, request validation, error handling, and OpenAPI documentation.
 
+## 🚀 Working Example
+
+**Want to see it in action?** Check out the complete, runnable example in the [`example/`](./example) directory!
+
+```bash
+cd example
+npm install
+npm run build
+func start
+```
+
+See [`example/README.md`](./example/README.md) for detailed instructions and API testing examples.
+
+---
+
 ## Features
 
 ✅ **Simple Handler Wrapper** - Single function that handles all middleware  
@@ -157,6 +172,8 @@ curl -X POST http://localhost:7071/api/users \
 ---
 
 ## Complete Setup Guide
+
+**💡 TIP:** For a working example you can run immediately, see the [`example/`](./example) directory.
 
 For a complete step-by-step guide including project structure, configuration files, service layer patterns, and all function handlers, see:
 

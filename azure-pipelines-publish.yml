@@ -1,18 +1,13 @@
 name: Publish Package
 
-# Manual trigger only
-trigger: none
+# Trigger on version tags (v*.*.*)
+trigger:
+  tags:
+    include:
+      - v*.*.*
 
-# Manual trigger with version bump parameter
-parameters:
-  - name: versionBump
-    displayName: 'Version Bump Type'
-    type: string
-    default: 'patch'
-    values:
-      - patch
-      - minor
-      - major
+# No manual trigger
+pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -24,7 +19,7 @@ variables:
 
 jobs:
   - job: PublishPackage
-    displayName: 'Version, Build, and Publish'
+    displayName: 'Build and Publish'
     steps:
       # Setup Node.js
       - task: NodeTool@0
@@ -38,19 +33,19 @@ jobs:
         inputs:
           command: 'ci'
 
-      # Configure git for version commit
+      # Extract version from git tag
       - bash: |
-          git config user.email "azure-pipelines@noreply.example.com"
-          git config user.name "Azure Pipelines"
-        displayName: 'Configure Git'
+          TAG_VERSION=$(git describe --tags --exact-match)
+          PACKAGE_VERSION=${TAG_VERSION#v}
+          echo "Git tag: $TAG_VERSION"
+          echo "Package version: $PACKAGE_VERSION"
+          echo "##vso[task.setvariable variable=PackageVersion]$PACKAGE_VERSION"
+        displayName: 'Extract Version from Tag'
 
-      # Bump version
+      # Update package.json version to match the tag
       - bash: |
-          npm version ${{ parameters.versionBump }} --no-git-tag-version
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          echo "New version: $NEW_VERSION"
-          echo "##vso[task.setvariable variable=PackageVersion]$NEW_VERSION"
-        displayName: 'Bump Version'
+          npm version $(PackageVersion) --no-git-tag-version --allow-same-version
+        displayName: 'Update package.json Version'
 
       # Run quality checks
       - task: Npm@1
@@ -70,19 +65,6 @@ jobs:
         inputs:
           command: 'custom'
           customCommand: 'test'
-
-      # Commit and push version change (only after all checks pass)
-      - bash: |
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to $(PackageVersion) [skip ci]"
-          git push origin HEAD:$(Build.SourceBranchName)
-        displayName: 'Commit and Push Version'
-
-      # Create and push git tag
-      - bash: |
-          git tag -a "v$(PackageVersion)" -m "Release v$(PackageVersion)"
-          git push origin "v$(PackageVersion)"
-        displayName: 'Create and Push Git Tag'
 
       # Publish to Azure Artifacts
       - task: Npm@1

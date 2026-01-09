@@ -43,35 +43,23 @@ Automatically validates code quality on every pull request and push to main bran
 
 ---
 
-## Publish Pipeline - Package Publishing (Simplified)
+## Publish Pipeline - Package Publishing (Tag-Triggered)
 
 **File:** `azure-pipelines-publish.yml`
 
 ### Purpose
 
-Simplified one-step publish flow: version, build, test, tag, and publish to Azure Artifacts in a single job.
+Super simple tag-based publish flow: push a version tag, and the pipeline automatically builds, tests, and publishes to Azure Artifacts.
 
 ### What it does
 
-1. ✅ Bumps package version (patch/minor/major)
+1. ✅ Detects version tag (e.g., `v1.2.3`)
 2. ✅ Runs linting, builds, and tests
-3. ✅ Commits version change to repository
-4. ✅ Creates and pushes Git tag
-5. ✅ Publishes to Azure Artifacts feed
-
-All steps run sequentially in a single job for simplicity.
+3. ✅ Publishes to Azure Artifacts feed
 
 ### Triggers
 
-- **Manual only** - User selects version bump type when triggering
-
-### Version Bump Options
-
-When you trigger the pipeline, you can select:
-
-- **patch** - Bug fixes and minor updates (1.0.0 → 1.0.1)
-- **minor** - New features, backward compatible (1.0.0 → 1.1.0)
-- **major** - Breaking changes (1.0.0 → 2.0.0)
+- **Automatic on version tags** - Triggered when you push a tag matching `v*.*.*` (e.g., `v1.0.0`, `v2.1.3`)
 
 ### Setup
 
@@ -95,20 +83,11 @@ When you trigger the pipeline, you can select:
 2. Select your repository
 3. Choose "Existing Azure Pipelines YAML file"
 4. Select `/azure-pipelines-publish.yml`
-5. Save (don't run yet)
+5. Save
 
 #### 4. Configure Permissions
 
-The pipeline needs permission to:
-
-- Push to the repository (for version commits and tags)
-- Publish to Azure Artifacts feed
-
-**Enable repository write access:**
-
-1. Go to Project Settings → Repositories → Your Repo
-2. Under "Security" tab, find "Build Service"
-3. Grant "Contribute" and "Create tag" permissions
+The pipeline needs permission to publish to Azure Artifacts feed.
 
 **Enable Artifacts publish:**
 
@@ -118,12 +97,30 @@ The pipeline needs permission to:
 
 ### How to Publish
 
-1. Navigate to Pipelines → Select the Publish pipeline
-2. Click "Run pipeline"
-3. Select the version bump type:
-   - **patch** for bug fixes
-   - **minor** for new features
-   - **major** for breaking changes
+Publishing is now as simple as creating and pushing a git tag:
+
+```bash
+# 1. Update version in package.json (optional - pipeline will sync it)
+npm version patch  # or minor, or major
+
+# 2. Push the tag (this triggers the publish pipeline)
+git push origin v1.0.1
+
+# That's it! The pipeline will automatically:
+# - Build and test the code
+# - Publish to Azure Artifacts
+```
+
+**Version examples:**
+
+- `v1.0.1` - Patch release (bug fixes)
+- `v1.1.0` - Minor release (new features)
+- `v2.0.0` - Major release (breaking changes)
+
+✅ **Even simpler!** No manual pipeline triggers, no clicking buttons - just push a tag.
+
+- **major** for breaking changes
+
 4. Click "Run"
 
 The pipeline will run all steps in sequence:
@@ -134,7 +131,7 @@ The pipeline will run all steps in sequence:
 4. Create and push Git tag (e.g., `v1.2.3`)
 5. Publish to Azure Artifacts
 
-✅ **Simple and straightforward** - everything happens in one job!
+✅ **Even simpler!** No manual pipeline triggers, no clicking buttons - just push a tag.
 
 ### After Publishing
 
@@ -142,6 +139,25 @@ The new version will be available in your Azure Artifacts feed:
 
 ```bash
 npm install @qops/hub-kit@latest
+```
+
+### Alternative: Manual Version Update
+
+If you prefer to keep package.json version in sync before tagging:
+
+```bash
+# 1. Update version locally
+npm version 1.2.3 --no-git-tag-version
+
+# 2. Commit the change
+git add package.json package-lock.json
+git commit -m "chore: bump version to 1.2.3"
+
+# 3. Create and push tag
+git tag -a v1.2.3 -m "Release v1.2.3"
+git push origin main --follow-tags
+
+# Pipeline will trigger automatically on the tag!
 ```
 
 ---
@@ -163,7 +179,7 @@ npm install @qops/hub-kit@latest
 
 ### Tests Fail
 
-- Ensure all tests pass locally before triggering pipeline
+- Ensure all tests pass locally before pushing tags
 - Check test output in the pipeline logs
 - Coverage must be ≥80% for all metrics
 

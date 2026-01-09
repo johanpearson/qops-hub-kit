@@ -254,7 +254,7 @@ describe('handler', () => {
     const secret = 'test-secret-key';
 
     it('should authenticate valid JWT token', async () => {
-      const payload = { sub: '123', email: 'test@example.com', roles: [UserRole.MEMBER] };
+      const payload = { sub: '123', email: 'test@example.com', role: UserRole.MEMBER };
       const token = jwt.sign(payload, secret);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
@@ -342,7 +342,7 @@ describe('handler', () => {
     const secret = 'test-secret-key';
 
     it('should allow access for user with required role', async () => {
-      const payload = { sub: '123', roles: [UserRole.ADMIN] };
+      const payload = { sub: '123', role: UserRole.ADMIN };
       const token = jwt.sign(payload, secret);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
@@ -360,7 +360,7 @@ describe('handler', () => {
     });
 
     it('should allow access for user with one of multiple required roles', async () => {
-      const payload = { sub: '123', roles: [UserRole.MEMBER] };
+      const payload = { sub: '123', role: UserRole.MEMBER };
       const token = jwt.sign(payload, secret);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
@@ -377,7 +377,7 @@ describe('handler', () => {
     });
 
     it('should return 403 for user without required role', async () => {
-      const payload = { sub: '123', roles: [UserRole.MEMBER] };
+      const payload = { sub: '123', role: UserRole.MEMBER };
       const token = jwt.sign(payload, secret);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
@@ -413,8 +413,8 @@ describe('handler', () => {
       expect(response.jsonBody.error.code).toBe(ErrorCode.FORBIDDEN);
     });
 
-    it('should return 403 for user with empty roles array', async () => {
-      const payload = { sub: '123', roles: [] };
+    it('should return 403 for user with no role', async () => {
+      const payload = { sub: '123' };
       const token = jwt.sign(payload, secret);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
@@ -489,7 +489,7 @@ describe('handler', () => {
     });
 
     it('should handle auth + validation + logging together', async () => {
-      const payload = { sub: '123', roles: [UserRole.MEMBER] };
+      const payload = { sub: '123', role: UserRole.MEMBER };
       const token = jwt.sign(payload, secret);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 

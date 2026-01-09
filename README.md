@@ -233,6 +233,8 @@ const handler = createHandler(
 );
 ```
 
+**Note:** Admin users automatically have all member permissions (role hierarchy). An endpoint requiring `UserRole.MEMBER` will accept both admin and member users.
+
 ### 4. OpenAPI Documentation
 
 ```typescript
@@ -348,8 +350,9 @@ async (request, context, enrichedContext) => {
 2. **Service Layer Pattern** - Keep business logic separate from handlers
 3. **Input Validation** - Use Zod schemas for all user input
 4. **Error Handling** - Use `AppError` for consistent error responses
-5. **JWT Claims** - Always include `sub`, `email`, `name`, and `role` in tokens
-6. **Environment Variables** - Store secrets in environment variables, never in code
+5. **JWT Claims** - Always include `sub`, `email`, `name`, and `role` (singular string) in tokens
+6. **Role Hierarchy** - Admin role implicitly includes all member permissions
+7. **Environment Variables** - Store secrets in environment variables, never in code
 
 ---
 

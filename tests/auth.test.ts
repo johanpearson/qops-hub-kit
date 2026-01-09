@@ -43,13 +43,13 @@ describe('auth', () => {
     const secret = 'test-secret';
 
     it('should verify valid token and return payload', () => {
-      const payload = { sub: '123', email: 'test@example.com', roles: [UserRole.MEMBER] };
+      const payload = { sub: '123', email: 'test@example.com', role: UserRole.MEMBER };
       const token = jwt.sign(payload, secret);
 
       const result = verifyToken(token, { secret });
       expect(result.sub).toBe('123');
       expect(result.email).toBe('test@example.com');
-      expect(result.roles).toEqual([UserRole.MEMBER]);
+      expect(result.role).toBe(UserRole.MEMBER);
     });
 
     it('should throw error for expired token', () => {
@@ -75,23 +75,34 @@ describe('auth', () => {
 
   describe('verifyRole', () => {
     it('should pass if user has required role', () => {
-      const payload = { sub: '123', roles: [UserRole.ADMIN] };
+      const payload = { sub: '123', role: UserRole.ADMIN };
       expect(() => verifyRole(payload, [UserRole.ADMIN])).not.toThrow();
     });
 
     it('should pass if user has one of multiple required roles', () => {
-      const payload = { sub: '123', roles: [UserRole.MEMBER] };
+      const payload = { sub: '123', role: UserRole.MEMBER };
       expect(() => verifyRole(payload, [UserRole.MEMBER, UserRole.ADMIN])).not.toThrow();
     });
 
-    it('should throw error if user has no roles', () => {
+    it('should pass if admin accessing member-only endpoint (admin has implicit member permissions)', () => {
+      const payload = { sub: '123', role: UserRole.ADMIN };
+      expect(() => verifyRole(payload, [UserRole.MEMBER])).not.toThrow();
+    });
+
+    it('should throw error if member accessing admin-only endpoint', () => {
+      const payload = { sub: '123', role: UserRole.MEMBER };
+      expect(() => verifyRole(payload, [UserRole.ADMIN])).toThrow(AppError);
+      expect(() => verifyRole(payload, [UserRole.ADMIN])).toThrow('Required role not found');
+    });
+
+    it('should throw error if user has no role', () => {
       const payload = { sub: '123' };
       expect(() => verifyRole(payload, [UserRole.ADMIN])).toThrow(AppError);
-      expect(() => verifyRole(payload, [UserRole.ADMIN])).toThrow('No roles assigned to user');
+      expect(() => verifyRole(payload, [UserRole.ADMIN])).toThrow('No role assigned to user');
     });
 
     it('should throw error if user does not have required role', () => {
-      const payload = { sub: '123', roles: [UserRole.MEMBER] };
+      const payload = { sub: '123', role: 'guest' as UserRole };
       expect(() => verifyRole(payload, [UserRole.ADMIN])).toThrow(AppError);
       expect(() => verifyRole(payload, [UserRole.ADMIN])).toThrow('Required role not found');
     });

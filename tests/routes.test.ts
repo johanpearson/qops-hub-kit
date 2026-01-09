@@ -491,7 +491,7 @@ describe('routes', () => {
           responses: { 200: { description: 'Success' } },
         };
 
-        const token = jwt.sign({ sub: '123', roles: [UserRole.ADMIN] }, 'test-secret');
+        const token = jwt.sign({ sub: '123', role: UserRole.ADMIN }, 'test-secret');
         mockRequest.headers.set('authorization', `Bearer ${token}`);
 
         builder.route(route);

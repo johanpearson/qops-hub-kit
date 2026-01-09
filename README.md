@@ -281,6 +281,8 @@ const handler = createHandler(
 - **[Getting Started](./docs/GETTING-STARTED.md)** - Complete setup guide with all configuration files
 - **[Advanced Usage](./docs/ADVANCED.md)** - Complex validation, RBAC, testing, and best practices
 - **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault, and more
+- **[CI/CD Pipelines](./docs/PIPELINES.md)** - Azure Pipelines setup and configuration
+- **[Release Process](./docs/RELEASE-PROCESS.md)** - How to release new versions with protected branches
 
 ### 📖 API Reference
 
@@ -380,6 +382,15 @@ Contributions are welcome! Please ensure:
 - Code coverage ≥ 80% (`npm run test:coverage`)
 - Code is formatted (`npm run format`)
 - No linting errors (`npm run lint`)
+
+### Releasing New Versions
+
+This repository uses a manual tag creation process for protected main branches. See the [Release Process Guide](./docs/RELEASE-PROCESS.md) for details on:
+
+- Creating releases via pull requests
+- Semantic versioning guidelines
+- Manual tag creation via Azure DevOps UI
+- Publishing to Azure Artifacts
 
 ---
 

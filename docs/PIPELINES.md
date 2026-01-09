@@ -8,8 +8,22 @@ This project follows a **trunk-based development** workflow:
 
 - Create feature, bugfix, or hotfix branches from `main`
 - Merge changes back to `main` via pull requests
-- Release from `main` branch
+- Release from `main` branch using manual tag creation
 - No separate `develop` or `release` branches
+
+## Protected Branch Workflow
+
+Since the `main` branch is protected, tags cannot be pushed directly via `git push --follow-tags`. Instead, create tags manually through the Azure DevOps UI:
+
+1. Update version in `package.json` via PR and merge to `main`
+2. Navigate to Azure DevOps → Repos → Tags
+3. Click "New tag"
+4. Enter tag name (e.g., `v1.2.3`)
+5. Select `main` branch as the target
+6. Click "Create"
+7. Publish pipeline triggers automatically
+
+---
 
 ## CI Pipeline - Build and Test
 
@@ -103,66 +117,89 @@ The pipeline needs permission to publish to Azure Artifacts feed.
 
 ### How to Publish
 
-Publishing is simple with git tags from `main` or `hotfix/*` branch:
+With the **protected main branch**, publishing is done through pull requests and manual tag creation:
 
-**Option 1: Using npm version (recommended)**
+**Standard Release Process**
 
 ```bash
-# From main branch (standard release)
-git checkout main
-git pull
+# 1. Create a feature/release branch
+git checkout -b release/v1.2.3
+git pull --ff-only origin main
 
-# Update version and create tag automatically
-npm version patch  # or minor, or major
-# This updates package.json and creates a git tag
+# 2. Update version in package.json (no git tag needed)
+npm version 1.2.3 --no-git-tag-version
+# This updates package.json and package-lock.json
 
-# Push both commit and tag
-git push --follow-tags
+# 3. Commit the version change
+git add package.json package-lock.json
+git commit -m "chore: bump version to 1.2.3"
 
-# Pipeline will automatically:
-# - Validate branch is main or hotfix/*
-# - Run type checking
-# - Build and test the code
-# - Publish to Azure Artifacts
+# 4. Push branch and create PR
+git push origin release/v1.2.3
+
+# 5. Get PR approved and merge to main
+
+# 6. Create tag via Azure DevOps UI:
+#    a. Navigate to Azure DevOps → Repos → Tags
+#    b. Click "New tag"
+#    c. Enter tag name: v1.2.3
+#    d. Select branch: main
+#    e. Click "Create"
+#
+# 7. Publish pipeline triggers automatically and publishes the package
 ```
 
-**Option 2: Manual tag creation**
+**Alternative: Update version directly in feature PR**
 
 ```bash
-# From main branch
-git checkout main
-git pull
+# 1. Create feature branch for your changes
+git checkout -b feature/my-feature
 
-# Manually create tag
-git tag -a v1.0.1 -m "Release v1.0.1"
+# 2. Make your code changes
+# ... edit files ...
 
-# Push just the tag
-git push origin v1.0.1
+# 3. Before finalizing PR, update version
+npm version patch --no-git-tag-version  # or minor, or major
 
-# Pipeline triggers automatically
+# 4. Commit all changes including version bump
+git add .
+git commit -m "feat: add new feature and bump version"
+
+# 5. Push and create PR
+git push origin feature/my-feature
+
+# 6. After PR is merged, create tag via Azure DevOps UI (see steps above)
 ```
 
 **For hotfix releases:**
 
 ```bash
-# From hotfix branch (emergency fixes)
-git checkout hotfix/fix-critical-bug
-git pull
+# Same process but from hotfix branch
+git checkout -b hotfix/fix-critical-bug
 
-# Create version and tag
-npm version patch
-git push --follow-tags
+# Make fixes and bump version
+npm version patch --no-git-tag-version
+git add .
+git commit -m "fix: critical bug fix"
 
-# Pipeline will allow publishing from hotfix/* branches
+# Create PR to main
+git push origin hotfix/fix-critical-bug
+
+# After merge, create tag via Azure DevOps UI
 ```
 
 **Version examples:**
 
-- `v1.0.1` - Patch release (bug fixes)
-- `v1.1.0` - Minor release (new features)
-- `v2.0.0` - Major release (breaking changes)
+- `1.0.1` - Patch release (bug fixes)
+- `1.1.0` - Minor release (new features)
+- `2.0.0` - Major release (breaking changes)
 
-✅ **Even simpler!** No manual pipeline triggers, no clicking buttons - just push a tag.
+✅ **Key Benefits:**
+
+- Simple and straightforward process
+- Works with protected branches
+- Full control over when to release
+- No additional pipeline setup required
 
 ### After Publishing
 
@@ -172,24 +209,12 @@ The new version will be available in your Azure Artifacts feed:
 npm install @qops/hub-kit@latest
 ```
 
-### Alternative: Manual Version Update
+### What Happens Behind the Scenes
 
-If you prefer to keep package.json version in sync before tagging:
-
-```bash
-# 1. Update version locally
-npm version 1.2.3 --no-git-tag-version
-
-# 2. Commit the change
-git add package.json package-lock.json
-git commit -m "chore: bump version to 1.2.3"
-
-# 3. Create and push tag
-git tag -a v1.2.3 -m "Release v1.2.3"
-git push origin main --follow-tags
-
-# Pipeline will trigger automatically on the tag!
-```
+1. **PR Merged** → Version change in `package.json` lands on `main`
+2. **Manual Tag Creation** → Create tag (e.g., `v1.2.3`) via Azure DevOps UI
+3. **Publish Pipeline** → Triggered by new tag, builds and publishes package
+4. **Done** → New version available in Azure Artifacts feed
 
 ---
 
@@ -208,40 +233,50 @@ git push origin main --follow-tags
 
 ## Troubleshooting
 
+### Tag Creation Issues
+
+**Cannot push tags with git:**
+
+- This is expected with protected branches
+- Use Azure DevOps UI to create tags instead (Repos → Tags → New tag)
+
+**Publish pipeline doesn't trigger:**
+
+- Verify tag format matches `v*.*.*` pattern (e.g., `v1.2.3`, not `1.2.3`)
+- Ensure tag was created from `main` or `hotfix/*` branch
+- Check that publish pipeline is enabled in Azure DevOps
+
 ### Tests Fail
 
-- Ensure all tests pass locally before pushing tags
+- Ensure all tests pass locally before merging PR
 - Check test output in the pipeline logs
 - Coverage must be ≥80% for all metrics
 
 ### Publish Fails - Permission Denied
 
-- Verify Build Service has Contribute permission on repository
-- Verify Build Service has Contributor role on Artifacts feed
+- Verify Build Service has Contributor role on Artifacts feed (for publish pipeline)
+- Check Azure DevOps pipeline logs for specific error messages
 
 ### Version Already Exists
 
 - The version in package.json already exists in the feed
 - Select a higher version bump (e.g., minor instead of patch)
-- Or manually update version in package.json
-
-### Git Push Fails
-
-- Check that Build Service has permission to push to the branch
-- Ensure branch policies don't block Build Service pushes
+- Update version in package.json through a new PR
 
 ---
 
 ## Best Practices
 
-1. **Always run CI before publishing** - Ensure CI pipeline passes on your branch first
-2. **Use semantic versioning** - Choose the right version bump:
+1. **Version bump in PR** - Always update version in `package.json` as part of your PR
+2. **Run CI before merging** - Ensure CI pipeline passes before merging to main
+3. **Use semantic versioning** - Choose the right version bump:
    - patch: Bug fixes, documentation updates
    - minor: New features, backwards compatible
    - major: Breaking changes
-3. **Review changes** - Check what's being published before triggering the pipeline
-4. **Test locally** - Run `npm run build && npm test` before publishing
-5. **Update changelog** - Document changes in commits or CHANGELOG.md
+4. **Test locally** - Run `npm run build && npm test` before creating PR
+5. **Review changes** - Ensure CI passes and get PR approval before merging
+6. **Create tag after merge** - Use Azure DevOps UI to create tags from main
+7. **Update changelog** - Document changes in commits or CHANGELOG.md
 
 ---
 

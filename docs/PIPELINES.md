@@ -136,7 +136,7 @@ git push origin v1.0.1
 git checkout main
 git pull
 git checkout -b release/1.0.1
-npm version 1.0.1 --no-git-tag-version
+npm version patch --no-git-tag-version
 git add package.json package-lock.json
 git commit -m "chore: bump version to 1.0.1"
 git push origin release/1.0.1

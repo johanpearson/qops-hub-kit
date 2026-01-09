@@ -1,0 +1,99 @@
+name: Publish Package
+
+# Trigger on version tags (v*.*.*) only from main or hotfix branches
+trigger:
+  tags:
+    include:
+      - v*.*.*
+  branches:
+    include:
+      - main
+      - hotfix/*
+
+# No manual trigger
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  nodeVersion: '18.x'
+  # IMPORTANT: Update this to match your Azure Artifacts feed name
+  artifactFeedName: 'qops-feed'
+
+jobs:
+  - job: PublishPackage
+    displayName: 'Build and Publish'
+    steps:
+      # Setup Node.js
+      - task: NodeTool@0
+        displayName: 'Setup Node.js $(nodeVersion)'
+        inputs:
+          versionSpec: '$(nodeVersion)'
+
+      # Install dependencies
+      - task: Npm@1
+        displayName: 'Install dependencies'
+        inputs:
+          command: 'ci'
+
+      # Extract version from git tag and validate branch
+      - bash: |
+          TAG_VERSION=$(git describe --tags --exact-match)
+          PACKAGE_VERSION=${TAG_VERSION#v}
+          
+          # Get branch name from Azure Pipelines variable
+          BRANCH_NAME="$(Build.SourceBranch)"
+          BRANCH_NAME=${BRANCH_NAME#refs/heads/}
+          
+          echo "Git tag: $TAG_VERSION"
+          echo "Package version: $PACKAGE_VERSION"
+          echo "Branch: $BRANCH_NAME"
+          
+          # Validate branch is main or hotfix
+          if [[ "$BRANCH_NAME" != "main" && ! "$BRANCH_NAME" =~ ^hotfix/ ]]; then
+            echo "##vso[task.logissue type=error]Publishing is only allowed from 'main' or 'hotfix/*' branches. Current branch: $BRANCH_NAME"
+            exit 1
+          fi
+          
+          echo "##vso[task.setvariable variable=PackageVersion]$PACKAGE_VERSION"
+        displayName: 'Extract Version and Validate Branch'
+
+      # Update package.json version to match the tag
+      - bash: |
+          npm version $(PackageVersion) --no-git-tag-version --allow-same-version
+        displayName: 'Update package.json Version'
+
+      # Run quality checks
+      - task: Npm@1
+        displayName: 'Run Type Checking'
+        inputs:
+          command: 'custom'
+          customCommand: 'run typecheck'
+
+      - task: Npm@1
+        displayName: 'Build Package'
+        inputs:
+          command: 'custom'
+          customCommand: 'run build'
+
+      - task: Npm@1
+        displayName: 'Run Tests'
+        inputs:
+          command: 'custom'
+          customCommand: 'test'
+
+      # Publish to Azure Artifacts
+      - task: Npm@1
+        displayName: 'Publish to Azure Artifacts'
+        inputs:
+          command: 'publish'
+          publishRegistry: 'useFeed'
+          publishFeed: '$(artifactFeedName)'
+
+      # Success message
+      - bash: |
+          echo "✅ Successfully published version $(PackageVersion) to Azure Artifacts feed: $(artifactFeedName)"
+          echo "📦 Package: @qops/hub-kit@$(PackageVersion)"
+          echo "🏷️  Git tag: v$(PackageVersion)"
+        displayName: 'Publish Summary'

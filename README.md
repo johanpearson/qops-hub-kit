@@ -385,11 +385,11 @@ Contributions are welcome! Please ensure:
 
 ### Releasing New Versions
 
-This repository uses an automated release process for protected main branches. See the [Release Process Guide](./docs/RELEASE-PROCESS.md) for details on:
+This repository uses a manual tag creation process for protected main branches. See the [Release Process Guide](./docs/RELEASE-PROCESS.md) for details on:
 
 - Creating releases via pull requests
 - Semantic versioning guidelines
-- Automated tagging workflow
+- Manual tag creation via Azure DevOps UI
 - Publishing to Azure Artifacts
 
 ---

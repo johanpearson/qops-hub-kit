@@ -4,11 +4,11 @@ This document explains how to release new versions of `@qops/hub-kit` with a **p
 
 ## Overview
 
-Since the `main` branch is protected and doesn't allow direct pushes (including tags), we use an **automated tagging workflow**:
+Since the `main` branch is protected and doesn't allow direct tag pushes via `git`, we use **manual tag creation through Azure DevOps UI**:
 
 1. Developer updates version in `package.json` via PR
 2. PR is reviewed and merged to `main`
-3. Auto-tag pipeline detects version change and creates tag
+3. Create tag manually via Azure DevOps UI
 4. Publish pipeline is triggered by the tag
 5. Package is published to Azure Artifacts
 
@@ -33,11 +33,16 @@ git push origin release/v1.2.3
 
 # 5. Create PR, get approval, and merge
 
-# 6. Auto-tag pipeline will:
-#    ✅ Detect version change
-#    ✅ Create tag v1.2.3
-#    ✅ Trigger publish pipeline
-#    ✅ Publish to Azure Artifacts
+# 6. Create tag via Azure DevOps UI:
+#    a. Navigate to Azure DevOps → Repos → Tags
+#    b. Click "New tag"
+#    c. Enter tag name: v1.2.3
+#    d. Select branch: main
+#    e. Click "Create"
+#
+# 7. Publish pipeline triggers automatically
+#    ✅ Builds and tests the package
+#    ✅ Publishes to Azure Artifacts
 ```
 
 ### Including Version Bump in Feature PR
@@ -59,8 +64,10 @@ git commit -m "feat: add new feature"
 # 5. Push and create PR
 git push origin feature/my-new-feature
 
-# After merge, automatic tagging and publishing will occur
+# 6. After PR is merged, create tag via Azure DevOps UI (see steps above)
 ```
+
+````
 
 ## Semantic Versioning Guide
 
@@ -79,7 +86,7 @@ Choose the appropriate version bump based on your changes:
 
 ```bash
 npm version patch --no-git-tag-version
-```
+````
 
 ### Minor Release (1.0.0 → 1.1.0)
 
@@ -151,7 +158,7 @@ git push origin hotfix/fix-critical-issue
 
 # 5. Create PR to main, get expedited review
 
-# 6. After merge, auto-tag and publish pipelines run
+# 6. After merge, create tag via Azure DevOps UI
 ```
 
 ## Pipeline Architecture
@@ -168,21 +175,7 @@ git push origin hotfix/fix-critical-issue
 - Run tests with coverage
 - Publish test results
 
-### 2. Auto-Tag Pipeline (`azure-pipelines-tag.yml`)
-
-**Triggers:** Pushes to `main` that modify `package.json`
-
-**Actions:**
-
-- Compare version in `package.json` to latest git tag
-- If version changed, create new tag (e.g., `v1.2.3`)
-- Push tag to repository
-
-**Requirements:**
-
-- Build service needs "Contribute" permission on repository
-
-### 3. Publish Pipeline (`azure-pipelines-publish.yml`)
+### 2. Publish Pipeline (`azure-pipelines-publish.yml`)
 
 **Triggers:** Tags matching `v*.*.*` from `main` or `hotfix/*` branches
 
@@ -199,25 +192,17 @@ git push origin hotfix/fix-critical-issue
 
 ## Troubleshooting
 
-### Auto-tag pipeline doesn't create tag
+### Tag creation via git fails
 
-**Check:**
+**Issue:** Cannot push tags with `git push --follow-tags`
 
-1. Version in `package.json` is different from latest tag
-2. `package.json` was modified in the commit
-3. Build service has "Contribute" permission on repository
+**Solution:** This is expected with protected branches. Always use Azure DevOps UI to create tags:
 
-**How to fix:**
-
-```bash
-# Check latest tag
-git describe --tags --abbrev=0
-
-# Check version in package.json
-node -p "require('./package.json').version"
-
-# Ensure they're different
-```
+1. Navigate to Repos → Tags
+2. Click "New tag"
+3. Enter tag name (e.g., `v1.2.3`)
+4. Select `main` branch
+5. Click "Create"
 
 ### Publish pipeline doesn't trigger
 
@@ -247,11 +232,11 @@ git commit -m "chore: bump to next version"
 3. Push fixes to PR branch
 4. Re-run CI pipeline
 
-## Manual Tag Creation (Emergency Only)
+## Creating Tags via Azure DevOps UI
 
-If you need to manually create a tag (e.g., auto-tag pipeline is broken):
+This is the standard way to create tags with protected branches:
 
-**Via Azure DevOps Web UI:**
+**Steps:**
 
 1. Navigate to Repos → Tags
 2. Click "New tag"
@@ -259,8 +244,6 @@ If you need to manually create a tag (e.g., auto-tag pipeline is broken):
 4. Select target branch (`main`)
 5. Click "Create"
 6. Publish pipeline will trigger automatically
-
-**Not recommended:** Manual git tag push won't work with protected branches.
 
 ## Verifying Release
 
@@ -289,8 +272,7 @@ git show v1.2.3
 ### 3. Check Pipeline Runs
 
 - Navigate to Pipelines in Azure DevOps
-- Verify auto-tag pipeline ran successfully
-- Verify publish pipeline completed
+- Verify publish pipeline completed successfully
 - Check logs for any warnings
 
 ## Best Practices
@@ -299,14 +281,15 @@ git show v1.2.3
 2. **Update version last** - Make all code changes first, then bump version
 3. **Descriptive commit messages** - Clearly describe what changed
 4. **Test before merging** - Ensure CI passes before merge
-5. **Review pipeline logs** - Check for any issues or warnings
-6. **Coordinate major releases** - Communicate breaking changes to users
-7. **Keep CHANGELOG updated** - Document notable changes
+5. **Create tag after merge** - Use Azure DevOps UI to create tags
+6. **Review pipeline logs** - Check for any issues or warnings
+7. **Coordinate major releases** - Communicate breaking changes to users
+8. **Keep CHANGELOG updated** - Document notable changes
 
 ## FAQ
 
 **Q: Can I push tags directly to main?**  
-A: No, the main branch is protected. Use the PR workflow instead.
+A: No, the main branch is protected. Use Azure DevOps UI to create tags.
 
 **Q: What if I need to re-release the same version?**  
 A: You can't republish the same version. Bump to the next patch version.
@@ -318,7 +301,7 @@ A: You can't delete versions from Azure Artifacts. Release a new patch version w
 A: Yes, create a tag manually in Azure DevOps UI from a test branch to verify the pipeline works.
 
 **Q: How long does the release process take?**  
-A: Typically 5-10 minutes after PR merge (auto-tag + publish pipelines).
+A: Typically 5-10 minutes after creating the tag (publish pipeline).
 
 ## Support
 

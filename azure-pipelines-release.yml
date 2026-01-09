@@ -1,0 +1,96 @@
+name: Create Release Branch
+
+# Manual trigger only - no automatic triggers
+trigger: none
+pr: none
+
+parameters:
+  - name: versionType
+    displayName: 'Version Bump Type'
+    type: string
+    default: 'patch'
+    values:
+      - patch
+      - minor
+      - major
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  nodeVersion: '18.x'
+
+jobs:
+  - job: CreateRelease
+    displayName: 'Create Release Branch'
+    steps:
+      # Setup Node.js
+      - task: NodeTool@0
+        displayName: 'Setup Node.js $(nodeVersion)'
+        inputs:
+          versionSpec: '$(nodeVersion)'
+
+      # Checkout with persist credentials for push
+      - checkout: self
+        persistCredentials: true
+        displayName: 'Checkout main branch'
+
+      # Install dependencies
+      - task: Npm@1
+        displayName: 'Install dependencies'
+        inputs:
+          command: 'ci'
+
+      # Configure git
+      - bash: |
+          git config user.name "Azure Pipelines"
+          git config user.email "azuredevops@microsoft.com"
+        displayName: 'Configure Git'
+
+      # Bump version and create release branch
+      - bash: |
+          VERSION_TYPE="${{ parameters.versionType }}"
+          
+          echo "Selected version bump type: $VERSION_TYPE"
+          
+          # Ensure we're on main
+          git checkout main
+          git pull origin main
+          
+          # Bump version using npm
+          NEW_VERSION=$(npm version $VERSION_TYPE --no-git-tag-version)
+          NEW_VERSION=${NEW_VERSION#v}  # Remove 'v' prefix if present
+          
+          echo "New version: $NEW_VERSION"
+          
+          # Create release branch name
+          RELEASE_BRANCH="release/$NEW_VERSION"
+          
+          echo "Creating release branch: $RELEASE_BRANCH"
+          
+          # Create and checkout release branch
+          git checkout -b $RELEASE_BRANCH
+          
+          # Commit the version change
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to $NEW_VERSION"
+          
+          # Push the release branch
+          git push origin $RELEASE_BRANCH
+          
+          echo "##vso[task.setvariable variable=NewVersion]$NEW_VERSION"
+          echo "##vso[task.setvariable variable=ReleaseBranch]$RELEASE_BRANCH"
+        displayName: 'Bump Version and Create Release Branch'
+
+      # Summary
+      - bash: |
+          echo "✅ Successfully created release branch"
+          echo "🌿 Branch: $(ReleaseBranch)"
+          echo "📦 New version: $(NewVersion)"
+          echo ""
+          echo "Next steps:"
+          echo "1. The release branch has been created with the updated version"
+          echo "2. Review the changes in the release branch"
+          echo "3. Tag the release branch with 'v$(NewVersion)' to trigger publishing"
+          echo "4. Merge the release branch back to main after successful publish"
+        displayName: 'Release Summary'

@@ -1,0 +1,79 @@
+name: Auto Tag on Version Change
+
+# Trigger on pushes to main branch (after PR merges)
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - package.json
+
+# No PR trigger - this only runs after merge
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+jobs:
+  - job: CheckAndTag
+    displayName: 'Check Version and Create Tag'
+    steps:
+      # Checkout with full history and persist credentials for tagging
+      - checkout: self
+        persistCredentials: true
+        fetchDepth: 0
+
+      # Check if version in package.json changed and needs tagging
+      - bash: |
+          # Get current version from package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version in package.json: $CURRENT_VERSION"
+          
+          # Get latest tag (if any)
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST_VERSION=${LATEST_TAG#v}
+          echo "Latest tag version: $LATEST_VERSION"
+          
+          # Compare versions
+          if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+            echo "No version change detected. Current version $CURRENT_VERSION matches latest tag $LATEST_TAG"
+            echo "##vso[task.setvariable variable=ShouldTag]false"
+          else
+            echo "Version change detected: $LATEST_VERSION -> $CURRENT_VERSION"
+            echo "##vso[task.setvariable variable=ShouldTag]true"
+            echo "##vso[task.setvariable variable=NewVersion]$CURRENT_VERSION"
+          fi
+        displayName: 'Detect Version Change'
+
+      # Create and push tag if version changed
+      - bash: |
+          # Configure git
+          git config user.name "Azure Pipeline"
+          git config user.email "pipeline@azure.com"
+          
+          # Create annotated tag
+          TAG_NAME="v$(NewVersion)"
+          echo "Creating tag: $TAG_NAME"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          
+          # Push tag
+          echo "Pushing tag to origin..."
+          git push origin "$TAG_NAME"
+          
+          echo "✅ Successfully created and pushed tag $TAG_NAME"
+          echo "📦 This will trigger the publish pipeline to release version $(NewVersion)"
+        displayName: 'Create and Push Tag'
+        condition: eq(variables['ShouldTag'], 'true')
+
+      # Summary message
+      - bash: |
+          if [ "$(ShouldTag)" = "true" ]; then
+            echo "🎉 Tag v$(NewVersion) created successfully!"
+            echo "The publish pipeline will now build and publish the package."
+          else
+            echo "ℹ️ No version change detected - no tag created."
+            echo "To trigger a release, update the version in package.json and merge to main."
+          fi
+        displayName: 'Summary'
+        condition: always()

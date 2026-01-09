@@ -1,10 +1,14 @@
 name: Publish Package
 
-# Trigger on version tags (v*.*.*)
+# Trigger on version tags (v*.*.*) only from main or hotfix branches
 trigger:
   tags:
     include:
       - v*.*.*
+  branches:
+    include:
+      - main
+      - hotfix/*
 
 # No manual trigger
 pr: none
@@ -37,10 +41,20 @@ jobs:
       - bash: |
           TAG_VERSION=$(git describe --tags --exact-match)
           PACKAGE_VERSION=${TAG_VERSION#v}
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+          
           echo "Git tag: $TAG_VERSION"
           echo "Package version: $PACKAGE_VERSION"
+          echo "Branch: $BRANCH_NAME"
+          
+          # Validate branch is main or hotfix
+          if [[ "$BRANCH_NAME" != "main" && ! "$BRANCH_NAME" =~ ^hotfix/ ]]; then
+            echo "##vso[task.logissue type=error]Publishing is only allowed from 'main' or 'hotfix/*' branches. Current branch: $BRANCH_NAME"
+            exit 1
+          fi
+          
           echo "##vso[task.setvariable variable=PackageVersion]$PACKAGE_VERSION"
-        displayName: 'Extract Version from Tag'
+        displayName: 'Extract Version and Validate Branch'
 
       # Update package.json version to match the tag
       - bash: |
@@ -49,10 +63,10 @@ jobs:
 
       # Run quality checks
       - task: Npm@1
-        displayName: 'Run Linting'
+        displayName: 'Run Type Checking'
         inputs:
           command: 'custom'
-          customCommand: 'run lint'
+          customCommand: 'run typecheck'
 
       - task: Npm@1
         displayName: 'Build Package'

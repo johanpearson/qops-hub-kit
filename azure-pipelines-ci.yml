@@ -22,7 +22,7 @@ stages:
     displayName: 'Build and Test'
     jobs:
       - job: BuildTest
-        displayName: 'Build, Lint, and Test'
+        displayName: 'Typecheck, Build, and Test'
         steps:
           - task: NodeTool@0
             displayName: 'Use Node.js $(nodeVersion)'
@@ -36,10 +36,10 @@ stages:
               workingDir: '$(Build.SourcesDirectory)'
 
           - task: Npm@1
-            displayName: 'Run linting'
+            displayName: 'Run type checking'
             inputs:
               command: 'custom'
-              customCommand: 'run lint'
+              customCommand: 'run typecheck'
               workingDir: '$(Build.SourcesDirectory)'
 
           - task: Npm@1

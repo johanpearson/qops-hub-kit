@@ -22,11 +22,13 @@ Automatically validates code quality on every pull request and push to main bran
 ### What it does
 
 1. ✅ Installs Node.js dependencies
-2. ✅ Runs ESLint to check code style
+2. ✅ Runs TypeScript type checking
 3. ✅ Builds TypeScript code
 4. ✅ Runs unit tests with coverage
 5. ✅ Publishes test results and coverage reports
 6. ✅ Creates build artifacts
+
+**Note:** Linting is handled by Husky pre-commit hooks, not in the pipeline.
 
 ### Triggers
 
@@ -49,17 +51,21 @@ Automatically validates code quality on every pull request and push to main bran
 
 ### Purpose
 
-Super simple tag-based publish flow: push a version tag, and the pipeline automatically builds, tests, and publishes to Azure Artifacts.
+Super simple tag-based publish flow: push a version tag from `main` or `hotfix/*` branch, and the pipeline automatically builds, tests, and publishes to Azure Artifacts.
 
 ### What it does
 
-1. ✅ Detects version tag (e.g., `v1.2.3`)
-2. ✅ Runs linting, builds, and tests
-3. ✅ Publishes to Azure Artifacts feed
+1. ✅ Validates branch is `main` or `hotfix/*`
+2. ✅ Detects version tag (e.g., `v1.2.3`)
+3. ✅ Runs type checking, builds, and tests
+4. ✅ Publishes to Azure Artifacts feed
+
+**Note:** Linting is handled by Husky pre-commit hooks, not in the pipeline.
 
 ### Triggers
 
 - **Automatic on version tags** - Triggered when you push a tag matching `v*.*.*` (e.g., `v1.0.0`, `v2.1.3`)
+- **Branch restrictions** - Only publishes from `main` or `hotfix/*` branches for safety
 
 ### Setup
 
@@ -97,9 +103,13 @@ The pipeline needs permission to publish to Azure Artifacts feed.
 
 ### How to Publish
 
-Publishing is now as simple as creating and pushing a git tag:
+Publishing is now as simple as creating and pushing a git tag from `main` or `hotfix/*` branch:
 
 ```bash
+# From main branch (standard release)
+git checkout main
+git pull
+
 # 1. Update version in package.json (optional - pipeline will sync it)
 npm version patch  # or minor, or major
 
@@ -107,8 +117,24 @@ npm version patch  # or minor, or major
 git push origin v1.0.1
 
 # That's it! The pipeline will automatically:
+# - Validate branch is main or hotfix/*
+# - Run type checking
 # - Build and test the code
 # - Publish to Azure Artifacts
+```
+
+**For hotfix releases:**
+
+```bash
+# From hotfix branch (emergency fixes)
+git checkout hotfix/fix-critical-bug
+git pull
+
+# Create and push tag
+npm version patch
+git push origin v1.0.2
+
+# Pipeline will allow publishing from hotfix/* branches
 ```
 
 **Version examples:**
@@ -116,20 +142,6 @@ git push origin v1.0.1
 - `v1.0.1` - Patch release (bug fixes)
 - `v1.1.0` - Minor release (new features)
 - `v2.0.0` - Major release (breaking changes)
-
-✅ **Even simpler!** No manual pipeline triggers, no clicking buttons - just push a tag.
-
-- **major** for breaking changes
-
-4. Click "Run"
-
-The pipeline will run all steps in sequence:
-
-1. Bump the version in `package.json`
-2. Run linting, build, and tests
-3. Commit and push the version change
-4. Create and push Git tag (e.g., `v1.2.3`)
-5. Publish to Azure Artifacts
 
 ✅ **Even simpler!** No manual pipeline triggers, no clicking buttons - just push a tag.
 

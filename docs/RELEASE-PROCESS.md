@@ -19,7 +19,7 @@ Since the `main` branch is protected and doesn't allow direct pushes (including 
 ```bash
 # 1. Create release branch
 git checkout -b release/v1.2.3
-git pull origin main
+git pull --ff-only origin main
 
 # 2. Update version (without creating git tag)
 npm version 1.2.3 --no-git-tag-version
@@ -136,7 +136,7 @@ For critical bugs that need immediate release:
 ```bash
 # 1. Create hotfix branch from main
 git checkout -b hotfix/fix-critical-issue
-git pull origin main
+git pull --ff-only origin main
 
 # 2. Make the fix
 # ... edit code ...

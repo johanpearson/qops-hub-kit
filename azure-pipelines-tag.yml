@@ -31,13 +31,19 @@ jobs:
           echo "Current version in package.json: $CURRENT_VERSION"
 
           # Get latest tag (if any)
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          LATEST_VERSION=${LATEST_TAG#v}
-          echo "Latest tag version: $LATEST_VERSION"
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No existing tags found. This will be the first release."
+            LATEST_VERSION="0.0.0"
+          else
+            LATEST_VERSION=${LATEST_TAG#v}
+            echo "Latest tag: $LATEST_TAG (version: $LATEST_VERSION)"
+          fi
 
           # Compare versions
           if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
-            echo "No version change detected. Current version $CURRENT_VERSION matches latest tag $LATEST_TAG"
+            echo "No version change detected. Current version $CURRENT_VERSION matches latest version $LATEST_VERSION"
             echo "##vso[task.setvariable variable=ShouldTag]false"
           else
             echo "Version change detected: $LATEST_VERSION -> $CURRENT_VERSION"

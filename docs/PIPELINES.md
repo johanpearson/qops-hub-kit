@@ -166,7 +166,7 @@ With the **protected main branch**, publishing is done through pull requests and
 ```bash
 # 1. Create a feature/release branch
 git checkout -b release/v1.2.3
-git pull origin main
+git pull --ff-only origin main
 
 # 2. Update version in package.json (no git tag needed)
 npm version 1.2.3 --no-git-tag-version

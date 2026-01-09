@@ -25,7 +25,7 @@ const adminUser: User = {
   id: randomUUID(),
   email: 'admin@example.com',
   name: 'Admin User',
-  passwordHash: 'hashed_admin_password', // Use bcrypt in production
+  passwordHash: 'hashed_admin_password', // NOTE: Use bcrypt in production!
   role: 'admin',
 };
 users.set(adminUser.id, adminUser);
@@ -35,7 +35,7 @@ const memberUser: User = {
   id: randomUUID(),
   email: 'member@example.com',
   name: 'Member User',
-  passwordHash: 'hashed_member_password', // Use bcrypt in production
+  passwordHash: 'hashed_member_password', // NOTE: Use bcrypt in production!
   role: 'member',
 };
 users.set(memberUser.id, memberUser);
@@ -48,6 +48,7 @@ export async function authenticateUser(email: string, password: string): Promise
   }
 
   const user = users.get(userId);
+  // NOTE: This is a simple example. In production, use bcrypt or similar for password hashing!
   if (!user || user.passwordHash !== `hashed_${password}`) {
     throw new AppError(ErrorCode.UNAUTHORIZED, 'Invalid credentials');
   }

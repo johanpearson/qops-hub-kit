@@ -298,6 +298,7 @@ const handler = createHandler(
 - **[Getting Started](./docs/GETTING-STARTED.md)** - Complete setup guide with all configuration files
 - **[Advanced Usage](./docs/ADVANCED.md)** - Complex validation, RBAC, testing, and best practices
 - **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault, and more
+- **[Troubleshooting](./docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
 ### 📖 API Reference
 

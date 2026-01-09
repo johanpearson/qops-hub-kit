@@ -32,12 +32,19 @@
 
 ```
 src/
+├── schemas/     # Shared Zod schemas (reused in functions & OpenAPI)
 ├── services/    # Business logic
 ├── functions/   # Azure Function handlers
 └── types/       # Shared TypeScript types
 tests/
 ├── *.test.ts    # Unit tests (same name as source file)
 ```
+
+### Best Practices
+
+- **Always generate OpenAPI documentation** for all endpoints
+- **Reuse Zod schemas** - Define schemas once in a shared location (e.g., `src/schemas/` directory) and import them in both function handlers and OpenAPI documentation to avoid duplication
+- This eliminates schema duplication and provides a single source of truth
 
 ## @qops/hub-kit Package Usage
 
@@ -133,29 +140,68 @@ Configure authentication in handlers:
 
 User data is available in handler via `{ user }` destructuring.
 
-### Request Validation
+### Request Validation with Shared Schemas
 
-- Use Zod schemas for all input validation
-- Define schemas inline or in separate schema files for reuse
-- Validate request body, query params, and path params
+- **Always define schemas once** in `src/schemas/` directory
+- **Import and reuse** schemas in both function handlers and OpenAPI documentation
+- This prevents duplication and ensures consistency
 
 ```typescript
+// src/schemas/user.schemas.ts - Define once
 import { z } from '@qops/hub-kit';
 
-const createUserSchema = z.object({
+export const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(100),
   age: z.number().int().min(18).optional(),
+});
+
+export const userResponseSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  name: z.string(),
+  role: z.enum(['admin', 'member']),
+});
+```
+
+**Use in function handlers:**
+
+```typescript
+// src/functions/create-user.ts
+import { createHandler } from '@qops/hub-kit';
+import { createUserSchema } from '../schemas/user.schemas.js';
+
+export default createHandler(
+  async (request, context, { body }) => {
+    // body is validated and typed
+    return { status: 201, jsonBody: await createUser(body) };
+  },
+  { bodySchema: createUserSchema },
+);
+```
+
+**Use in OpenAPI documentation:**
+
+```typescript
+// src/functions/openapi.ts
+import { createUserSchema, userResponseSchema } from '../schemas/user.schemas.js';
+
+builder.registerRoute({
+  method: 'POST',
+  path: '/api/users',
+  requestBody: createUserSchema, // No duplication!
+  responses: { 201: { schema: userResponseSchema } },
 });
 ```
 
 ### OpenAPI Documentation
 
-Generate OpenAPI v3 documentation for your API:
+**Always generate OpenAPI documentation** for your API endpoints:
 
 ```typescript
 // functions/openapi.ts
 import { createHandler, OpenApiBuilder } from '@qops/hub-kit';
+import { createUserSchema, userResponseSchema } from '../schemas/user.schemas.js';
 
 const builder = new OpenApiBuilder({
   title: 'Your API',

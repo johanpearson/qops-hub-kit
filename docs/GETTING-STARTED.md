@@ -2,6 +2,25 @@
 
 This guide walks you through setting up a complete Azure Functions project using @qops/hub-kit from scratch.
 
+## 💡 Quick Start with Example
+
+**Want to skip ahead and see a working example?** Check out the [`example/`](../example) directory in this repository for a complete, runnable Azure Functions project!
+
+```bash
+cd example
+npm install
+npm run build
+func start
+```
+
+See [`example/README.md`](../example/README.md) for detailed instructions, test credentials, and API examples.
+
+---
+
+## Step-by-Step Setup
+
+Continue reading for a detailed guide on creating your own project from scratch.
+
 ## Prerequisites
 
 - Node.js 18.x or later

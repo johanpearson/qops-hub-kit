@@ -2,6 +2,21 @@
 
 A lightweight utility package for creating Azure Function v4 APIs with TypeScript. Eliminates boilerplate for JWT authentication, request validation, error handling, and OpenAPI documentation.
 
+## 🚀 Working Example
+
+**Want to see it in action?** Check out the complete, runnable example in the [`example/`](./example) directory!
+
+```bash
+cd example
+npm install
+npm run build
+func start
+```
+
+See [`example/README.md`](./example/README.md) for detailed instructions and API testing examples.
+
+---
+
 ## Features
 
 ✅ **Simple Handler Wrapper** - Single function that handles all middleware  
@@ -158,6 +173,8 @@ curl -X POST http://localhost:7071/api/users \
 
 ## Complete Setup Guide
 
+**💡 TIP:** For a working example you can run immediately, see the [`example/`](./example) directory.
+
 For a complete step-by-step guide including project structure, configuration files, service layer patterns, and all function handlers, see:
 
 👉 **[Getting Started Guide](./docs/GETTING-STARTED.md)**
@@ -215,6 +232,8 @@ const handler = createHandler(
   },
 );
 ```
+
+**Note:** Admin users automatically have all member permissions (role hierarchy). An endpoint requiring `UserRole.MEMBER` will accept both admin and member users.
 
 ### 4. OpenAPI Documentation
 
@@ -281,6 +300,7 @@ const handler = createHandler(
 - **[Getting Started](./docs/GETTING-STARTED.md)** - Complete setup guide with all configuration files
 - **[Advanced Usage](./docs/ADVANCED.md)** - Complex validation, RBAC, testing, and best practices
 - **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault, and more
+- **[Troubleshooting](./docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
 ### 📖 API Reference
 
@@ -330,8 +350,9 @@ async (request, context, enrichedContext) => {
 2. **Service Layer Pattern** - Keep business logic separate from handlers
 3. **Input Validation** - Use Zod schemas for all user input
 4. **Error Handling** - Use `AppError` for consistent error responses
-5. **JWT Claims** - Always include `sub`, `email`, `name`, and `role` in tokens
-6. **Environment Variables** - Store secrets in environment variables, never in code
+5. **JWT Claims** - Always include `sub`, `email`, `name`, and `role` (singular string) in tokens
+6. **Role Hierarchy** - Admin role implicitly includes all member permissions
+7. **Environment Variables** - Store secrets in environment variables, never in code
 
 ---
 

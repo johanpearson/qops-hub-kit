@@ -16,7 +16,8 @@ export enum UserRole {
 export interface JwtPayload {
   sub?: string;
   email?: string;
-  roles?: UserRole[];
+  name?: string;
+  role?: string;
   [key: string]: any;
 }
 
@@ -98,11 +99,19 @@ export function verifyToken(token: string, config: JwtConfig): JwtPayload {
  * @throws AppError if user doesn't have required role
  */
 export function verifyRole(payload: JwtPayload, requiredRoles: UserRole[]): void {
-  if (!payload.roles || payload.roles.length === 0) {
-    throw createForbiddenError('No roles assigned to user');
+  if (!payload.role) {
+    throw createForbiddenError('No role assigned to user');
   }
 
-  const hasRole = requiredRoles.some((role) => payload.roles?.includes(role));
+  const userRole = payload.role as UserRole;
+
+  // Admin implicitly has all member permissions
+  const effectiveRoles: UserRole[] = [userRole];
+  if (userRole === UserRole.ADMIN) {
+    effectiveRoles.push(UserRole.MEMBER);
+  }
+
+  const hasRole = requiredRoles.some((role) => effectiveRoles.includes(role));
   if (!hasRole) {
     throw createForbiddenError(`Required role not found. Required: ${requiredRoles.join(', ')}`);
   }

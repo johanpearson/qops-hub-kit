@@ -1,0 +1,7 @@
+node_modules
+dist
+.vscode
+*.log
+.DS_Store
+# Note: local.settings.json is normally gitignored, but we include it in this example for convenience
+# local.settings.json

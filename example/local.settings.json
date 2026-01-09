@@ -1,0 +1,8 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "JWT_SECRET": "example-secret-key-min-32-chars-replace-in-production-d8f7a6b5c4e3"
+  }
+}

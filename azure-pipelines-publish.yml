@@ -44,30 +44,45 @@ jobs:
           git config user.name "Azure Pipelines"
         displayName: 'Configure Git'
 
-      # Bump version, build, test, and publish
+      # Bump version
       - bash: |
-          # Bump version
           npm version ${{ parameters.versionBump }} --no-git-tag-version
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "New version: $NEW_VERSION"
           echo "##vso[task.setvariable variable=PackageVersion]$NEW_VERSION"
-          
-          # Run quality checks
-          npm run lint
-          npm run build
-          npm test
-          
-          # Commit and push version change
+        displayName: 'Bump Version'
+
+      # Run quality checks
+      - task: Npm@1
+        displayName: 'Run Linting'
+        inputs:
+          command: 'custom'
+          customCommand: 'run lint'
+
+      - task: Npm@1
+        displayName: 'Build Package'
+        inputs:
+          command: 'custom'
+          customCommand: 'run build'
+
+      - task: Npm@1
+        displayName: 'Run Tests'
+        inputs:
+          command: 'custom'
+          customCommand: 'test'
+
+      # Commit and push version change (only after all checks pass)
+      - bash: |
           git add package.json package-lock.json
-          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git commit -m "chore: bump version to $(PackageVersion) [skip ci]"
           git push origin HEAD:$(Build.SourceBranchName)
-          
-          # Create and push git tag
-          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
-          git push origin "v$NEW_VERSION"
-          
-          echo "Package version: $NEW_VERSION"
-        displayName: 'Version, Build, Test, and Tag'
+        displayName: 'Commit and Push Version'
+
+      # Create and push git tag
+      - bash: |
+          git tag -a "v$(PackageVersion)" -m "Release v$(PackageVersion)"
+          git push origin "v$(PackageVersion)"
+        displayName: 'Create and Push Git Tag'
 
       # Publish to Azure Artifacts
       - task: Npm@1

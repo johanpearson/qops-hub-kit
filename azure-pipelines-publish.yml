@@ -37,11 +37,14 @@ jobs:
         inputs:
           command: 'ci'
 
-      # Extract version from git tag
+      # Extract version from git tag and validate branch
       - bash: |
           TAG_VERSION=$(git describe --tags --exact-match)
           PACKAGE_VERSION=${TAG_VERSION#v}
-          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+          
+          # Get branch name from Azure Pipelines variable
+          BRANCH_NAME="$(Build.SourceBranch)"
+          BRANCH_NAME=${BRANCH_NAME#refs/heads/}
           
           echo "Git tag: $TAG_VERSION"
           echo "Package version: $PACKAGE_VERSION"

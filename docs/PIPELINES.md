@@ -103,24 +103,43 @@ The pipeline needs permission to publish to Azure Artifacts feed.
 
 ### How to Publish
 
-Publishing is now as simple as creating and pushing a git tag from `main` or `hotfix/*` branch:
+Publishing is simple with git tags from `main` or `hotfix/*` branch:
+
+**Option 1: Using npm version (recommended)**
 
 ```bash
 # From main branch (standard release)
 git checkout main
 git pull
 
-# 1. Update version in package.json (optional - pipeline will sync it)
+# Update version and create tag automatically
 npm version patch  # or minor, or major
+# This updates package.json and creates a git tag
 
-# 2. Push the tag (this triggers the publish pipeline)
-git push origin v1.0.1
+# Push both commit and tag
+git push --follow-tags
 
-# That's it! The pipeline will automatically:
+# Pipeline will automatically:
 # - Validate branch is main or hotfix/*
 # - Run type checking
 # - Build and test the code
 # - Publish to Azure Artifacts
+```
+
+**Option 2: Manual tag creation**
+
+```bash
+# From main branch
+git checkout main
+git pull
+
+# Manually create tag
+git tag -a v1.0.1 -m "Release v1.0.1"
+
+# Push just the tag
+git push origin v1.0.1
+
+# Pipeline triggers automatically
 ```
 
 **For hotfix releases:**
@@ -130,9 +149,9 @@ git push origin v1.0.1
 git checkout hotfix/fix-critical-bug
 git pull
 
-# Create and push tag
+# Create version and tag
 npm version patch
-git push origin v1.0.2
+git push --follow-tags
 
 # Pipeline will allow publishing from hotfix/* branches
 ```

@@ -20,154 +20,66 @@ pool:
 variables:
   nodeVersion: '18.x'
   # IMPORTANT: Update this to match your Azure Artifacts feed name
-  # Example: 'my-organization-feed'
   artifactFeedName: 'qops-feed'
 
-stages:
-  - stage: Version
-    displayName: 'Version and Build'
-    jobs:
-      - job: VersionBump
-        displayName: 'Bump Version and Build'
-        steps:
-          - task: NodeTool@0
-            displayName: 'Use Node.js $(nodeVersion)'
-            inputs:
-              versionSpec: '$(nodeVersion)'
+jobs:
+  - job: PublishPackage
+    displayName: 'Version, Build, and Publish'
+    steps:
+      # Setup Node.js
+      - task: NodeTool@0
+        displayName: 'Setup Node.js $(nodeVersion)'
+        inputs:
+          versionSpec: '$(nodeVersion)'
 
-          - task: Npm@1
-            displayName: 'Install dependencies'
-            inputs:
-              command: 'ci'
-              workingDir: '$(Build.SourcesDirectory)'
+      # Install dependencies
+      - task: Npm@1
+        displayName: 'Install dependencies'
+        inputs:
+          command: 'ci'
 
-          - bash: |
-              git config user.email "azure-pipelines@noreply.example.com"
-              git config user.name "Azure Pipelines"
-            displayName: 'Configure Git'
+      # Configure git for version commit
+      - bash: |
+          git config user.email "azure-pipelines@noreply.example.com"
+          git config user.name "Azure Pipelines"
+        displayName: 'Configure Git'
 
-          - bash: |
-              # Bump version based on parameter
-              npm version ${{ parameters.versionBump }} --no-git-tag-version
-              
-              # Get the new version
-              NEW_VERSION=$(node -p "require('./package.json').version")
-              echo "New version: $NEW_VERSION"
-              
-              # Set as pipeline variable
-              echo "##vso[task.setvariable variable=PackageVersion;isOutput=true]$NEW_VERSION"
-              
-              # Commit the version change
-              git add package.json package-lock.json
-              git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-            displayName: 'Bump package version'
-            name: versionStep
+      # Bump version, build, test, and publish
+      - bash: |
+          # Bump version
+          npm version ${{ parameters.versionBump }} --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "New version: $NEW_VERSION"
+          echo "##vso[task.setvariable variable=PackageVersion]$NEW_VERSION"
+          
+          # Run quality checks
+          npm run lint
+          npm run build
+          npm test
+          
+          # Commit and push version change
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push origin HEAD:$(Build.SourceBranchName)
+          
+          # Create and push git tag
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+          
+          echo "Package version: $NEW_VERSION"
+        displayName: 'Version, Build, Test, and Tag'
 
-          - task: Npm@1
-            displayName: 'Run linting'
-            inputs:
-              command: 'custom'
-              customCommand: 'run lint'
-              workingDir: '$(Build.SourcesDirectory)'
+      # Publish to Azure Artifacts
+      - task: Npm@1
+        displayName: 'Publish to Azure Artifacts'
+        inputs:
+          command: 'publish'
+          publishRegistry: 'useFeed'
+          publishFeed: '$(artifactFeedName)'
 
-          - task: Npm@1
-            displayName: 'Build TypeScript'
-            inputs:
-              command: 'custom'
-              customCommand: 'run build'
-              workingDir: '$(Build.SourcesDirectory)'
-
-          - task: Npm@1
-            displayName: 'Run tests'
-            inputs:
-              command: 'custom'
-              customCommand: 'test'
-              workingDir: '$(Build.SourcesDirectory)'
-
-          - bash: |
-              git push origin HEAD:$(Build.SourceBranchName)
-            displayName: 'Push version commit'
-            condition: succeeded()
-
-          - task: CopyFiles@2
-            displayName: 'Copy package files'
-            inputs:
-              contents: |
-                package.json
-                package-lock.json
-                dist/**
-                README.md
-                LICENSE
-              targetFolder: '$(Build.ArtifactStagingDirectory)'
-
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish build artifacts'
-            inputs:
-              pathToPublish: '$(Build.ArtifactStagingDirectory)'
-              artifactName: 'package'
-              publishLocation: 'Container'
-
-  - stage: Publish
-    displayName: 'Publish to Azure Artifacts'
-    dependsOn: Version
-    condition: succeeded()
-    jobs:
-      - job: PublishPackage
-        displayName: 'Publish npm package'
-        variables:
-          PackageVersion: $[ stageDependencies.Version.VersionBump.outputs['versionStep.PackageVersion'] ]
-        steps:
-          - checkout: none
-
-          - task: DownloadBuildArtifacts@1
-            displayName: 'Download build artifacts'
-            inputs:
-              buildType: 'current'
-              downloadType: 'single'
-              artifactName: 'package'
-              downloadPath: '$(System.ArtifactsDirectory)'
-
-          - task: NodeTool@0
-            displayName: 'Use Node.js $(nodeVersion)'
-            inputs:
-              versionSpec: '$(nodeVersion)'
-
-          - task: Npm@1
-            displayName: 'Publish package to Azure Artifacts'
-            inputs:
-              command: 'publish'
-              workingDir: '$(System.ArtifactsDirectory)/package'
-              publishRegistry: 'useFeed'
-              publishFeed: '$(artifactFeedName)'
-
-          - bash: |
-              echo "##vso[task.complete result=Succeeded;]Package version $(PackageVersion) published successfully to Azure Artifacts feed: $(artifactFeedName)"
-            displayName: 'Publish success message'
-            condition: succeeded()
-
-  - stage: CreateTag
-    displayName: 'Create Git Tag'
-    dependsOn:
-      - Version
-      - Publish
-    condition: succeeded()
-    jobs:
-      - job: TagRelease
-        displayName: 'Tag release in Git'
-        variables:
-          PackageVersion: $[ stageDependencies.Version.VersionBump.outputs['versionStep.PackageVersion'] ]
-        steps:
-          - checkout: self
-            persistCredentials: true
-
-          - bash: |
-              git config user.email "azure-pipelines@noreply.example.com"
-              git config user.name "Azure Pipelines"
-              
-              # Create and push tag
-              git tag -a "v$(PackageVersion)" -m "Release version $(PackageVersion)"
-              git push origin "v$(PackageVersion)"
-              
-              echo "Created and pushed tag v$(PackageVersion)"
-            displayName: 'Create and push Git tag'
-            condition: succeeded()
+      # Success message
+      - bash: |
+          echo "✅ Successfully published version $(PackageVersion) to Azure Artifacts feed: $(artifactFeedName)"
+          echo "📦 Package: @qops/hub-kit@$(PackageVersion)"
+          echo "🏷️  Git tag: v$(PackageVersion)"
+        displayName: 'Publish Summary'

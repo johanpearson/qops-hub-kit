@@ -1,11 +1,10 @@
 name: CI - Build and Test
 
-# Trigger on pull requests and pushes to main
+# Trigger on pull requests and pushes to main (trunk-based workflow)
 trigger:
   branches:
     include:
       - main
-      - develop
 
 pr:
   branches:

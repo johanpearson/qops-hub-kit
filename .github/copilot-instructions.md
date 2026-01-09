@@ -33,11 +33,12 @@ src/
 ├── *.ts           # Core library code
 tests/
 ├── *.test.ts      # Unit tests (same name as source file)
-example/
-├── src/
-│   ├── services/  # Business logic
-│   └── functions/ # Azure Function handlers
 ```
+
+### Best Practices
+
+- **Always generate OpenAPI documentation** for all endpoints
+- **Reuse Zod schemas** - Define schemas once in a shared location (e.g., `schemas/` directory) and import them in both function handlers and OpenAPI documentation to avoid duplication
 
 ## Testing Standards
 

@@ -1,6 +1,15 @@
 # Azure Pipelines
 
-This repository includes two Azure Pipeline configurations for CI/CD automation.
+This repository includes two Azure Pipeline configurations for CI/CD automation using a **trunk-based workflow**.
+
+## Branching Strategy
+
+This project follows a **trunk-based development** workflow:
+
+- Create feature, bugfix, or hotfix branches from `main`
+- Merge changes back to `main` via pull requests
+- Release from `main` branch
+- No separate `develop` or `release` branches
 
 ## CI Pipeline - Build and Test
 
@@ -8,7 +17,7 @@ This repository includes two Azure Pipeline configurations for CI/CD automation.
 
 ### Purpose
 
-Automatically validates code quality on every pull request and push to main/develop branches.
+Automatically validates code quality on every pull request and push to main branch.
 
 ### What it does
 
@@ -22,7 +31,7 @@ Automatically validates code quality on every pull request and push to main/deve
 ### Triggers
 
 - Pull requests to any branch
-- Pushes to `main` or `develop` branches
+- Pushes to `main` branch
 
 ### Setup
 
@@ -34,22 +43,23 @@ Automatically validates code quality on every pull request and push to main/deve
 
 ---
 
-## Publish Pipeline - Package Publishing
+## Publish Pipeline - Package Publishing (Simplified)
 
 **File:** `azure-pipelines-publish.yml`
 
 ### Purpose
 
-Publishes the npm package to Azure Artifacts with automatic versioning.
+Simplified one-step publish flow: version, build, test, tag, and publish to Azure Artifacts in a single job.
 
 ### What it does
 
 1. ✅ Bumps package version (patch/minor/major)
-2. ✅ Runs linting and tests
-3. ✅ Builds the package
-4. ✅ Commits version change to repository
+2. ✅ Runs linting, builds, and tests
+3. ✅ Commits version change to repository
+4. ✅ Creates and pushes Git tag
 5. ✅ Publishes to Azure Artifacts feed
-6. ✅ Creates Git tag for the release
+
+All steps run sequentially in a single job for simplicity.
 
 ### Triggers
 
@@ -116,13 +126,15 @@ The pipeline needs permission to:
    - **major** for breaking changes
 4. Click "Run"
 
-The pipeline will:
+The pipeline will run all steps in sequence:
 
 1. Bump the version in `package.json`
-2. Run tests to ensure everything works
+2. Run linting, build, and tests
 3. Commit and push the version change
-4. Publish to Azure Artifacts
-5. Create a Git tag (e.g., `v1.2.3`)
+4. Create and push Git tag (e.g., `v1.2.3`)
+5. Publish to Azure Artifacts
+
+✅ **Simple and straightforward** - everything happens in one job!
 
 ### After Publishing
 

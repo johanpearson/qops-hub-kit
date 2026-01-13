@@ -28,19 +28,15 @@ param keyVaultName string = ''
 @secure()
 param jwtSecret string = ''
 
-@description('App Service Plan SKU')
+@description('App Service Plan SKU (Y1=Consumption - only option for cost optimization)')
 @allowed([
-  'Y1' // Consumption
-  'EP1' // Elastic Premium 1
-  'EP2' // Elastic Premium 2
-  'EP3' // Elastic Premium 3
+  'Y1' // Consumption plan - pay per execution
 ])
 param skuName string = 'Y1'
 
-@description('App Service Plan tier')
+@description('App Service Plan tier (Dynamic=Consumption)')
 @allowed([
   'Dynamic' // Consumption
-  'ElasticPremium' // Premium
 ])
 param skuTier string = 'Dynamic'
 

@@ -13,13 +13,9 @@ param environment string
 @description('Service name')
 param serviceName string
 
-@description('Storage account SKU')
+@description('Storage account SKU (Standard_LRS only - cheapest option)')
 @allowed([
-  'Standard_LRS'
-  'Standard_GRS'
-  'Standard_RAGRS'
-  'Standard_ZRS'
-  'Premium_LRS'
+  'Standard_LRS' // Locally redundant storage - cheapest option
 ])
 param skuName string = 'Standard_LRS'
 

@@ -55,14 +55,14 @@ jobs:
           workingDirectory: ${{ parameters.workingDirectory }}
 
       # Type check
-      - script: npm run typecheck
-        displayName: 'Run type checking'
-        workingDirectory: ${{ parameters.workingDirectory }}
-        condition: ne('${{ parameters.workingDirectory }}', '')
-
-      - script: npm run typecheck
-        displayName: 'Run type checking'
-        condition: eq('${{ parameters.workingDirectory }}', '')
+      - ${{ if ne(parameters.workingDirectory, '') }}:
+        - script: npm run typecheck
+          displayName: 'Run type checking'
+          workingDirectory: ${{ parameters.workingDirectory }}
+      
+      - ${{ if eq(parameters.workingDirectory, '') }}:
+        - script: npm run typecheck
+          displayName: 'Run type checking'
 
       # Build
       - template: ../steps/build.yml

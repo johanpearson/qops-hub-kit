@@ -1,5 +1,6 @@
 # Function App Pipeline Example
 # Complete example showing how to build and deploy a Function App with blob storage
+# This pipeline deploys infrastructure and code together
 # Copy this to your service repository and customize as needed
 
 name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.r)
@@ -25,21 +26,20 @@ variables:
     value: 'myservice' # Change to your service name
   - name: azureSubscription
     value: 'Azure-Connection' # Your Azure DevOps service connection
+  - name: location
+    value: 'swedencentral'
   
-  # Function App names (get these from your infrastructure deployment)
-  - name: functionAppNameDev
-    value: 'func-qops-myservice-dev-xyz'
-  - name: functionAppNameTest
-    value: 'func-qops-myservice-test-xyz'
-  - name: functionAppNameProd
-    value: 'func-qops-myservice-prod-xyz'
+  # Variable groups for secrets (see VARIABLE-GROUPS.md for setup)
+  - group: qops-common-secrets-dev
+  - group: qops-common-secrets-test
+  - group: qops-common-secrets-prod
 
 # Reference the qops-hub-kit repository for templates
 resources:
   repositories:
-    - repository: templates
+    - repository: hubkit
       type: git
-      name: qops-hub-kit # Your Azure DevOps project/repo name
+      name: qops-hub-kit
       ref: refs/heads/main
 
 stages:
@@ -54,7 +54,7 @@ stages:
         
         steps:
           # Prepare Node.js
-          - template: pipelines/steps/prepare-node.yml@templates
+          - template: pipelines/steps/prepare-node.yml@hubkit
             parameters:
               nodeVersion: $(nodeVersion)
 
@@ -63,12 +63,12 @@ stages:
             displayName: 'Type check'
 
           # Build
-          - template: pipelines/steps/build.yml@templates
+          - template: pipelines/steps/build.yml@hubkit
             parameters:
               buildScript: 'npm run build'
 
           # Unit tests
-          - template: pipelines/steps/unit-test.yml@templates
+          - template: pipelines/steps/unit-test.yml@hubkit
             parameters:
               testScript: 'npm run test:coverage'
               publishResults: true
@@ -85,12 +85,9 @@ stages:
               replaceExistingArchive: true
 
           # Publish artifact
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish artifacts'
-            inputs:
-              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-              ArtifactName: 'drop'
-              publishLocation: 'Container'
+          - publish: '$(Build.ArtifactStagingDirectory)/$(serviceName).zip'
+            artifact: package
+            displayName: 'Publish package'
 
   # Deploy to Dev
   - stage: DeployDev
@@ -98,20 +95,63 @@ stages:
     dependsOn: CI
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-      - deployment: DeployDev
-        displayName: 'Deploy to Dev Environment'
-        environment: 'dev'
+      # Deploy infrastructure
+      - job: DeployInfraDev
+        displayName: 'Deploy DEV Infrastructure'
         pool:
           vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: hubkit
+            displayName: 'Checkout hub-kit templates'
+
+          - task: AzureCLI@2
+            displayName: 'Deploy infrastructure'
+            name: infraOutput
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Deploying $(serviceName) infrastructure to dev"
+                
+                DEPLOYMENT_NAME="$(serviceName)-dev-$(Build.BuildId)"
+                
+                # Deploy infrastructure and capture outputs
+                az deployment sub create \
+                  --name $DEPLOYMENT_NAME \
+                  --location $(location) \
+                  --template-file infra/service.bicep \
+                  --parameters environment=dev \
+                  --parameters serviceName=$(serviceName) \
+                  --parameters location=$(location) \
+                  --parameters jwtSecret="$(JWT_SECRET_DEV)"
+                
+                # Get Function App name from deployment output
+                FUNCTION_APP_NAME=$(az deployment sub show \
+                  --name $DEPLOYMENT_NAME \
+                  --query properties.outputs.functionAppName.value -o tsv)
+                
+                echo "Function App Name: $FUNCTION_APP_NAME"
+                echo "##vso[task.setvariable variable=functionAppName;isOutput=true]$FUNCTION_APP_NAME"
+
+      # Deploy application
+      - deployment: DeployAppDev
+        displayName: 'Deploy DEV Application'
+        dependsOn: DeployInfraDev
+        environment: dev
+        pool:
+          vmImage: 'ubuntu-latest'
+        variables:
+          functionAppName: $[ dependencies.DeployInfraDev.outputs['infraOutput.functionAppName'] ]
         strategy:
           runOnce:
             deploy:
               steps:
-                - template: pipelines/steps/deploy-function-app.yml@templates
+                - template: pipelines/steps/deploy-function-app.yml@hubkit
                   parameters:
                     azureSubscription: $(azureSubscription)
-                    functionAppName: $(functionAppNameDev)
-                    package: '$(Pipeline.Workspace)/drop/$(serviceName).zip'
+                    functionAppName: $(functionAppName)
+                    package: '$(Pipeline.Workspace)/package/$(serviceName).zip'
 
   # Deploy to Test (with approval)
   - stage: DeployTest
@@ -119,20 +159,60 @@ stages:
     dependsOn: DeployDev
     condition: succeeded()
     jobs:
-      - deployment: DeployTest
-        displayName: 'Deploy to Test Environment'
-        environment: 'test' # Configure approvals in Azure DevOps
+      # Deploy infrastructure
+      - job: DeployInfraTest
+        displayName: 'Deploy TEST Infrastructure'
         pool:
           vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: hubkit
+            displayName: 'Checkout hub-kit templates'
+
+          - task: AzureCLI@2
+            displayName: 'Deploy infrastructure'
+            name: infraOutput
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Deploying $(serviceName) infrastructure to test"
+                
+                DEPLOYMENT_NAME="$(serviceName)-test-$(Build.BuildId)"
+                
+                az deployment sub create \
+                  --name $DEPLOYMENT_NAME \
+                  --location $(location) \
+                  --template-file infra/service.bicep \
+                  --parameters environment=test \
+                  --parameters serviceName=$(serviceName) \
+                  --parameters location=$(location) \
+                  --parameters jwtSecret="$(JWT_SECRET_TEST)"
+                
+                FUNCTION_APP_NAME=$(az deployment sub show \
+                  --name $DEPLOYMENT_NAME \
+                  --query properties.outputs.functionAppName.value -o tsv)
+                
+                echo "##vso[task.setvariable variable=functionAppName;isOutput=true]$FUNCTION_APP_NAME"
+
+      # Deploy application
+      - deployment: DeployAppTest
+        displayName: 'Deploy TEST Application'
+        dependsOn: DeployInfraTest
+        environment: test # Configure approvals in Azure DevOps
+        pool:
+          vmImage: 'ubuntu-latest'
+        variables:
+          functionAppName: $[ dependencies.DeployInfraTest.outputs['infraOutput.functionAppName'] ]
         strategy:
           runOnce:
             deploy:
               steps:
-                - template: pipelines/steps/deploy-function-app.yml@templates
+                - template: pipelines/steps/deploy-function-app.yml@hubkit
                   parameters:
                     azureSubscription: $(azureSubscription)
-                    functionAppName: $(functionAppNameTest)
-                    package: '$(Pipeline.Workspace)/drop/$(serviceName).zip'
+                    functionAppName: $(functionAppName)
+                    package: '$(Pipeline.Workspace)/package/$(serviceName).zip'
 
   # Deploy to Prod (with approval)
   - stage: DeployProd
@@ -140,17 +220,57 @@ stages:
     dependsOn: DeployTest
     condition: succeeded()
     jobs:
-      - deployment: DeployProd
-        displayName: 'Deploy to Production Environment'
-        environment: 'prod' # Configure approvals in Azure DevOps
+      # Deploy infrastructure
+      - job: DeployInfraProd
+        displayName: 'Deploy PROD Infrastructure'
         pool:
           vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: hubkit
+            displayName: 'Checkout hub-kit templates'
+
+          - task: AzureCLI@2
+            displayName: 'Deploy infrastructure'
+            name: infraOutput
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Deploying $(serviceName) infrastructure to prod"
+                
+                DEPLOYMENT_NAME="$(serviceName)-prod-$(Build.BuildId)"
+                
+                az deployment sub create \
+                  --name $DEPLOYMENT_NAME \
+                  --location $(location) \
+                  --template-file infra/service.bicep \
+                  --parameters environment=prod \
+                  --parameters serviceName=$(serviceName) \
+                  --parameters location=$(location) \
+                  --parameters jwtSecret="$(JWT_SECRET_PROD)"
+                
+                FUNCTION_APP_NAME=$(az deployment sub show \
+                  --name $DEPLOYMENT_NAME \
+                  --query properties.outputs.functionAppName.value -o tsv)
+                
+                echo "##vso[task.setvariable variable=functionAppName;isOutput=true]$FUNCTION_APP_NAME"
+
+      # Deploy application
+      - deployment: DeployAppProd
+        displayName: 'Deploy PROD Application'
+        dependsOn: DeployInfraProd
+        environment: prod # Configure approvals in Azure DevOps
+        pool:
+          vmImage: 'ubuntu-latest'
+        variables:
+          functionAppName: $[ dependencies.DeployInfraProd.outputs['infraOutput.functionAppName'] ]
         strategy:
           runOnce:
             deploy:
               steps:
-                - template: pipelines/steps/deploy-function-app.yml@templates
+                - template: pipelines/steps/deploy-function-app.yml@hubkit
                   parameters:
                     azureSubscription: $(azureSubscription)
-                    functionAppName: $(functionAppNameProd)
-                    package: '$(Pipeline.Workspace)/drop/$(serviceName).zip'
+                    functionAppName: $(functionAppName)
+                    package: '$(Pipeline.Workspace)/package/$(serviceName).zip'

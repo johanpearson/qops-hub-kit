@@ -34,6 +34,23 @@ export interface RouteDefinition {
    */
   requestBody?: z.ZodTypeAny;
   /**
+   * Form data schema for file uploads (Zod object schema)
+   * When specified, generates multipart/form-data request body
+   */
+  formDataSchema?: z.ZodObject<any>;
+  /**
+   * File upload fields configuration
+   * Maps field name to file configuration
+   */
+  fileUploads?: Record<
+    string,
+    {
+      description?: string;
+      required?: boolean;
+      multiple?: boolean;
+    }
+  >;
+  /**
    * Query parameters schema (Zod object schema)
    */
   queryParams?: z.ZodObject<any>;
@@ -107,15 +124,76 @@ export class OpenApiBuilder {
    * @param route - Route definition
    */
   registerRoute(route: RouteDefinition): void {
-    const requestBody = route.requestBody
-      ? {
-          content: {
-            'application/json': {
-              schema: route.requestBody,
+    let requestBody;
+
+    // Handle multipart/form-data for file uploads
+    if (route.formDataSchema || route.fileUploads) {
+      const properties: any = {};
+      const required: string[] = [];
+
+      // Add regular form fields from schema
+      if (route.formDataSchema) {
+        // Use the schema directly for OpenAPI generation
+        // The zod-to-openapi library will handle the conversion
+        const schemaShape = (route.formDataSchema as any)._def?.shape;
+        if (schemaShape) {
+          if (typeof schemaShape === 'function') {
+            const shape = schemaShape();
+            for (const [key, zodType] of Object.entries(shape)) {
+              properties[key] = zodType;
+              const isOptional = (zodType as any)._def?.typeName === 'ZodOptional';
+              if (!isOptional) {
+                required.push(key);
+              }
+            }
+          } else {
+            // Handle direct shape object
+            for (const [key, zodType] of Object.entries(schemaShape)) {
+              properties[key] = zodType;
+              const isOptional = (zodType as any)._def?.typeName === 'ZodOptional';
+              if (!isOptional) {
+                required.push(key);
+              }
+            }
+          }
+        }
+      }
+
+      // Add file upload fields
+      if (route.fileUploads) {
+        for (const [fieldName, fileConfig] of Object.entries(route.fileUploads)) {
+          properties[fieldName] = {
+            type: 'string',
+            format: 'binary',
+            description: fileConfig.description,
+          };
+          if (fileConfig.required) {
+            required.push(fieldName);
+          }
+        }
+      }
+
+      requestBody = {
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties,
+              ...(required.length > 0 && { required }),
             },
           },
-        }
-      : undefined;
+        },
+      };
+    } else if (route.requestBody) {
+      // Regular JSON request body
+      requestBody = {
+        content: {
+          'application/json': {
+            schema: route.requestBody,
+          },
+        },
+      };
+    }
 
     const responses: any = {};
     for (const [statusCode, response] of Object.entries(route.responses)) {

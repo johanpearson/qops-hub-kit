@@ -256,5 +256,120 @@ describe('openapi', () => {
       expect(post.responses['422']).toBeDefined();
       expect(post.responses['500']).toBeDefined();
     });
+
+    it('should register route with file upload', () => {
+      const builder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
+      });
+
+      const formDataSchema = z.object({
+        title: z.string(),
+        description: z.string().optional(),
+      });
+
+      builder.registerRoute({
+        method: 'POST',
+        path: '/api/upload',
+        summary: 'Upload file',
+        formDataSchema,
+        fileUploads: {
+          file: {
+            description: 'File to upload',
+            required: true,
+          },
+        },
+        responses: {
+          200: {
+            description: 'File uploaded successfully',
+          },
+        },
+      });
+
+      const doc = builder.generateDocument();
+
+      expect(doc.paths['/api/upload'].post).toBeDefined();
+      const post = doc.paths['/api/upload'].post;
+      expect(post.requestBody).toBeDefined();
+      expect(post.requestBody.content['multipart/form-data']).toBeDefined();
+      const schema = post.requestBody.content['multipart/form-data'].schema;
+      expect(schema.properties.title).toBeDefined();
+      expect(schema.properties.file).toBeDefined();
+      expect(schema.properties.file.type).toBe('string');
+      expect(schema.properties.file.format).toBe('binary');
+      expect(schema.required).toContain('file');
+    });
+
+    it('should register route with multiple file uploads', () => {
+      const builder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
+      });
+
+      const formDataSchema = z.object({
+        name: z.string(),
+      });
+
+      builder.registerRoute({
+        method: 'POST',
+        path: '/api/upload-multiple',
+        summary: 'Upload multiple files',
+        formDataSchema,
+        fileUploads: {
+          document: {
+            description: 'Document file',
+            required: true,
+          },
+          image: {
+            description: 'Image file',
+            required: false,
+          },
+        },
+        responses: {
+          200: {
+            description: 'Files uploaded',
+          },
+        },
+      });
+
+      const doc = builder.generateDocument();
+
+      const post = doc.paths['/api/upload-multiple'].post;
+      const schema = post.requestBody.content['multipart/form-data'].schema;
+      expect(schema.properties.document).toBeDefined();
+      expect(schema.properties.image).toBeDefined();
+      expect(schema.required).toContain('document');
+      expect(schema.required).not.toContain('image');
+    });
+
+    it('should register file upload route without form data schema', () => {
+      const builder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
+      });
+
+      builder.registerRoute({
+        method: 'POST',
+        path: '/api/simple-upload',
+        summary: 'Simple file upload',
+        fileUploads: {
+          file: {
+            description: 'File to upload',
+            required: true,
+          },
+        },
+        responses: {
+          200: {
+            description: 'Success',
+          },
+        },
+      });
+
+      const doc = builder.generateDocument();
+
+      const post = doc.paths['/api/simple-upload'].post;
+      expect(post.requestBody.content['multipart/form-data']).toBeDefined();
+      expect(post.requestBody.content['multipart/form-data'].schema.properties.file).toBeDefined();
+    });
   });
 });

@@ -67,6 +67,8 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
       Environment: environment
       Service: serviceName
       ManagedBy: 'IaC'
+      Project: 'QOPS'
+      Owner: 'Johan Pearson'
     },
     tags
   )
@@ -154,6 +156,8 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
       Environment: environment
       Service: serviceName
       ManagedBy: 'IaC'
+      Project: 'QOPS'
+      Owner: 'Johan Pearson'
     },
     tags
   )

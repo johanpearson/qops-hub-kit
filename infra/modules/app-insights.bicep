@@ -31,6 +31,8 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10
       Environment: environment
       Service: serviceName
       ManagedBy: 'IaC'
+      Project: 'QOPS'
+      Owner: 'Johan Pearson'
     },
     tags
   )
@@ -52,6 +54,8 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
       Environment: environment
       Service: serviceName
       ManagedBy: 'IaC'
+      Project: 'QOPS'
+      Owner: 'Johan Pearson'
     },
     tags
   )

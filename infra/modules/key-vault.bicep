@@ -59,6 +59,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
       Environment: environment
       Service: 'common'
       ManagedBy: 'IaC'
+      Project: 'QOPS'
+      Owner: 'Johan Pearson'
     },
     tags
   )

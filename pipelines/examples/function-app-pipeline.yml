@@ -1,5 +1,5 @@
-# Single Service Pipeline Example
-# This example shows how to use the pipeline templates for a single service
+# Function App Pipeline Example
+# Complete example showing how to build and deploy a Function App with blob storage
 # Copy this to your service repository and customize as needed
 
 name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.r)

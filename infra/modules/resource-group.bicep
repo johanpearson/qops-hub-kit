@@ -28,6 +28,8 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
       Environment: environment
       Service: serviceName
       ManagedBy: 'IaC'
+      Project: 'QOPS'
+      Owner: 'Johan Pearson'
     },
     additionalTags
   )

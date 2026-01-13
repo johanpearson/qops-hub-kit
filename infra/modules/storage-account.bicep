@@ -59,6 +59,8 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
       Environment: environment
       Service: serviceName
       ManagedBy: 'IaC'
+      Project: 'QOPS'
+      Owner: 'Johan Pearson'
     },
     tags
   )

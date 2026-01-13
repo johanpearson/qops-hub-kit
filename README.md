@@ -456,70 +456,42 @@ The pipeline:
 
 ## Infrastructure & CI/CD Templates
 
-This repository also includes **reusable infrastructure and pipeline templates** for deploying Azure Functions services with a **serverless-first approach**.
+This repository includes **reusable infrastructure and pipeline templates** for deploying Azure Functions with cost-optimized resources.
 
-### 🏗️ Infrastructure Templates (Bicep)
+### 🏗️ Infrastructure Templates
 
-Located in `/infra` - Modular Bicep templates for deploying Azure resources:
+**Quick Start:**
+1. Run `azure-pipelines-common-resources.yml` to deploy shared Key Vault (once per environment)
+2. Use `infra/service.bicep` to deploy your Function App
 
-- **Serverless Azure Functions** (Consumption plan - cheapest)
-- **Storage Account** (blob and table storage with Standard_LRS)
-- **Key Vault** (for shared secrets like JWT)
-- **Application Insights** (monitoring)
+**Resources deployed:**
+- Serverless Azure Functions (Consumption plan Y1)
+- Storage Account (blob + table, Standard_LRS)
+- Key Vault for JWT secrets
+- Application Insights
 
-**Usage:** Reference from your service repository to deploy infrastructure independently.
+**Tags on all resources:** Project: QOPS, Owner: Johan Pearson
 
-👉 **[See Infrastructure Documentation](./infra/README.md)**
+👉 **[See Infrastructure Guide](./infra/README.md)** | **[Variable Groups Setup](./VARIABLE-GROUPS.md)**
 
-### 🚀 Pipeline Templates (Azure DevOps)
+### 🚀 Pipeline Templates
 
-Located in `/pipelines` - Reusable CI/CD templates for Azure Pipelines:
+Reusable step, job, and stage templates for Azure DevOps.
 
-**Step Templates:**
-- Node.js preparation (install, auth, npm ci)
-- Unit testing with coverage
-- Automated/E2E testing
-- Building TypeScript
-- Deploying to Azure Function Apps
-
-**Job & Stage Templates:**
-- Complete build and test jobs
-- Deployment jobs with environment support
-- CI/CD stages
-
-**Usage:** Reference from your service repository pipeline for consistent builds and deployments.
+**Example:** See `pipelines/examples/function-app-pipeline.yml`
 
 👉 **[See Pipeline Documentation](./pipelines/README.md)**
-
-### Quick Example
-
-```yaml
-# In your service repository's azure-pipelines.yml
-resources:
-  repositories:
-    - repository: hubkit
-      type: git
-      name: qops-hub-kit
-
-stages:
-  - stage: Build
-    jobs:
-      - job: BuildAndTest
-        steps:
-          - template: pipelines/steps/prepare-node.yml@hubkit
-          - template: pipelines/steps/build.yml@hubkit
-          - template: pipelines/steps/unit-test.yml@hubkit
-```
 
 ---
 
 ## Documentation
 
-### 📚 Detailed Guides
+### 📚 Guides
 
-- **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault, and more
-- **[Infrastructure Templates](./infra/README.md)** - Bicep templates for deploying Azure resources
-- **[Pipeline Templates](./pipelines/README.md)** - Azure DevOps CI/CD templates
+- **[Variable Groups Setup](./VARIABLE-GROUPS.md)** - How to configure Azure DevOps variable groups
+- **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault
+- **[Infrastructure](./infra/README.md)** - Bicep templates
+- **[Pipelines](./pipelines/README.md)** - Azure DevOps templates
 
 ## Best Practices
 

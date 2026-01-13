@@ -1,0 +1,241 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "File Upload Demo API",
+    "version": "1.0.0",
+    "description": "Demo API showcasing file upload capabilities with multipart/form-data"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:7071/api",
+      "description": "Local development server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {},
+    "parameters": {}
+  },
+  "paths": {
+    "/api/documents/upload": {
+      "post": {
+        "summary": "Upload document with metadata",
+        "description": "Upload one or more documents with associated metadata. Requires authentication. Supports PDF, Word, Excel, and text files.",
+        "tags": ["Documents"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Document file(s) to upload (supports multiple files)"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Document title"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Document description"
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "Document category"
+                  }
+                },
+                "required": ["file", "title", "category"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Document uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Generated document ID"
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Document title"
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Document description"
+                    },
+                    "category": {
+                      "type": "string",
+                      "description": "Document category"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "filename": {
+                            "type": "string",
+                            "description": "Original filename"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type"
+                          },
+                          "size": {
+                            "type": "number",
+                            "description": "File size in bytes"
+                          }
+                        },
+                        "required": ["filename", "mimeType", "size"]
+                      },
+                      "description": "Uploaded files"
+                    },
+                    "uploadedAt": {
+                      "type": "string",
+                      "description": "Upload timestamp"
+                    },
+                    "uploadedBy": {
+                      "type": "string",
+                      "description": "User ID who uploaded"
+                    }
+                  },
+                  "required": ["id", "title", "category", "files", "uploadedAt", "uploadedBy"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - no files provided or invalid data"
+          },
+          "401": {
+            "description": "Unauthorized - authentication required"
+          },
+          "422": {
+            "description": "Validation error - invalid form fields"
+          }
+        }
+      }
+    },
+    "/api/images/upload": {
+      "post": {
+        "summary": "Upload image with metadata",
+        "description": "Upload a single image file with metadata. Public endpoint (no authentication required). Supports JPG, PNG, GIF, and WebP formats.",
+        "tags": ["Images"],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to upload (single file only)"
+                  },
+                  "altText": {
+                    "type": "string",
+                    "description": "Alternative text for image"
+                  },
+                  "tags": {
+                    "type": "string",
+                    "description": "Comma-separated tags"
+                  }
+                },
+                "required": ["image", "altText"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Image uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Generated image ID"
+                    },
+                    "altText": {
+                      "type": "string",
+                      "description": "Alternative text"
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Image tags"
+                    },
+                    "image": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string",
+                          "description": "Original filename"
+                        },
+                        "mimeType": {
+                          "type": "string",
+                          "description": "MIME type"
+                        },
+                        "size": {
+                          "type": "number",
+                          "description": "File size in bytes"
+                        },
+                        "dimensions": {
+                          "type": "object",
+                          "properties": {
+                            "width": {
+                              "type": "number"
+                            },
+                            "height": {
+                              "type": "number"
+                            }
+                          },
+                          "required": ["width", "height"],
+                          "description": "Image dimensions"
+                        }
+                      },
+                      "required": ["filename", "mimeType", "size"]
+                    },
+                    "uploadedAt": {
+                      "type": "string",
+                      "description": "Upload timestamp"
+                    }
+                  },
+                  "required": ["id", "altText", "image", "uploadedAt"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid file type or missing file"
+          },
+          "422": {
+            "description": "Validation error - invalid form fields"
+          }
+        }
+      }
+    }
+  }
+}

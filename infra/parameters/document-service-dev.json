@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "serviceName": {
+      "value": "document"
+    },
+    "environment": {
+      "value": "dev"
+    },
+    "location": {
+      "value": "swedencentral"
+    },
+    "jwtSecret": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.KeyVault/vaults/{kv-name}"
+        },
+        "secretName": "jwt-secret"
+      }
+    },
+    "enableCosmosDb": {
+      "value": true
+    },
+    "cosmosDbDatabaseName": {
+      "value": "documentdb"
+    },
+    "cosmosDbContainerName": {
+      "value": "documents"
+    },
+    "enableSqlDatabase": {
+      "value": false
+    },
+    "functionAppSku": {
+      "value": "Y1"
+    }
+  }
+}

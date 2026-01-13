@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "value": "dev"
+    },
+    "location": {
+      "value": "swedencentral"
+    },
+    "jwtSecret": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.KeyVault/vaults/{kv-name}"
+        },
+        "secretName": "jwt-secret"
+      }
+    },
+    "sqlAdminPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.KeyVault/vaults/{kv-name}"
+        },
+        "secretName": "sql-admin-password"
+      }
+    },
+    "services": {
+      "value": [
+        {
+          "name": "profile",
+          "enableCosmosDb": false,
+          "enableSqlDatabase": true,
+          "databaseType": "postgresql"
+        },
+        {
+          "name": "document",
+          "enableCosmosDb": true,
+          "enableSqlDatabase": false,
+          "databaseType": "postgresql"
+        },
+        {
+          "name": "calendar",
+          "enableCosmosDb": false,
+          "enableSqlDatabase": true,
+          "databaseType": "postgresql"
+        }
+      ]
+    }
+  }
+}

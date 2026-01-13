@@ -454,11 +454,74 @@ The pipeline:
 
 ---
 
+## Infrastructure & CI/CD Templates
+
+This repository also includes **reusable infrastructure and pipeline templates** for deploying Azure Functions services with a **serverless-first approach**.
+
+### 🏗️ Infrastructure Templates (Bicep)
+
+Located in `/infra` - Modular Bicep templates for deploying Azure resources:
+
+- **Serverless Azure Functions** (Consumption plan)
+- **Cosmos DB** (serverless mode for document storage)
+- **Azure SQL/PostgreSQL** (serverless tier with auto-pause)
+- **Key Vault** (for shared secrets like JWT)
+- **Application Insights** (monitoring)
+- **Storage Accounts** (function storage)
+
+**Usage:** Reference from your service repository to deploy infrastructure independently.
+
+👉 **[See Infrastructure Documentation](./infra/README.md)**
+
+### 🚀 Pipeline Templates (Azure DevOps)
+
+Located in `/pipelines` - Reusable CI/CD templates for Azure Pipelines:
+
+**Step Templates:**
+- Node.js preparation (install, auth, npm ci)
+- Unit testing with coverage
+- Automated/E2E testing
+- Building TypeScript
+- Deploying to Azure Function Apps
+
+**Job & Stage Templates:**
+- Complete build and test jobs
+- Deployment jobs with environment support
+- CI/CD stages
+
+**Usage:** Reference from your service repository pipeline for consistent builds and deployments.
+
+👉 **[See Pipeline Documentation](./pipelines/README.md)**
+
+### Quick Example
+
+```yaml
+# In your service repository's azure-pipelines.yml
+resources:
+  repositories:
+    - repository: hubkit
+      type: git
+      name: qops-hub-kit
+
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildAndTest
+        steps:
+          - template: pipelines/steps/prepare-node.yml@hubkit
+          - template: pipelines/steps/build.yml@hubkit
+          - template: pipelines/steps/unit-test.yml@hubkit
+```
+
+---
+
 ## Documentation
 
 ### 📚 Detailed Guides
 
 - **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault, and more
+- **[Infrastructure Templates](./infra/README.md)** - Bicep templates for deploying Azure resources
+- **[Pipeline Templates](./pipelines/README.md)** - Azure DevOps CI/CD templates
 
 ## Best Practices
 

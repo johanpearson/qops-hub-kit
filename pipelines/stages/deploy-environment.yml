@@ -1,0 +1,98 @@
+# Deploy Environment Stage Template
+# Deployment stage for a specific environment with optional infrastructure deployment
+
+parameters:
+  - name: environment
+    type: string
+    displayName: 'Environment (dev/test/prod)'
+  
+  - name: azureSubscription
+    type: string
+    displayName: 'Azure service connection'
+  
+  - name: functionAppName
+    type: string
+    displayName: 'Function App name'
+  
+  - name: dependsOn
+    type: object
+    default: ['CI']
+    displayName: 'Stage dependencies'
+  
+  - name: stageName
+    type: string
+    default: ''
+    displayName: 'Stage name (auto-generated if empty)'
+  
+  - name: vmImage
+    type: string
+    default: 'ubuntu-latest'
+    displayName: 'VM image for deployment agent'
+  
+  - name: workingDirectory
+    type: string
+    default: ''
+    displayName: 'Working directory (optional)'
+  
+  - name: deployInfrastructure
+    type: boolean
+    default: false
+    displayName: 'Deploy infrastructure before deploying code'
+  
+  - name: resourceGroupName
+    type: string
+    default: ''
+    displayName: 'Resource group name (for infrastructure deployment)'
+  
+  - name: location
+    type: string
+    default: 'swedencentral'
+    displayName: 'Azure region'
+  
+  - name: bicepTemplatePath
+    type: string
+    default: 'infra/service.bicep'
+    displayName: 'Bicep template path'
+
+stages:
+  - stage: ${{ coalesce(parameters.stageName, format('Deploy_{0}', parameters.environment)) }}
+    displayName: 'Deploy to ${{ upper(parameters.environment) }}'
+    dependsOn: ${{ parameters.dependsOn }}
+    jobs:
+      # Deploy infrastructure (optional)
+      - ${{ if eq(parameters.deployInfrastructure, true) }}:
+        - job: DeployInfrastructure
+          displayName: 'Deploy Infrastructure'
+          pool:
+            vmImage: ${{ parameters.vmImage }}
+          steps:
+            - checkout: self
+              displayName: 'Checkout source code'
+
+            - task: AzureCLI@2
+              displayName: 'Deploy Bicep template'
+              inputs:
+                azureSubscription: ${{ parameters.azureSubscription }}
+                scriptType: 'bash'
+                scriptLocation: 'inlineScript'
+                inlineScript: |
+                  echo "Deploying infrastructure to ${{ parameters.environment }}"
+                  az deployment sub create \
+                    --location ${{ parameters.location }} \
+                    --template-file ${{ parameters.bicepTemplatePath }} \
+                    --parameters environment=${{ parameters.environment }} \
+                    --parameters functionAppName=${{ parameters.functionAppName }}
+
+      # Deploy application code
+      - template: ../jobs/deploy.yml
+        parameters:
+          environment: ${{ parameters.environment }}
+          azureSubscription: ${{ parameters.azureSubscription }}
+          functionAppName: ${{ parameters.functionAppName }}
+          vmImage: ${{ parameters.vmImage }}
+          workingDirectory: ${{ parameters.workingDirectory }}
+          jobName: 'DeployApp'
+          dependsOn: ${{ if eq(parameters.deployInfrastructure, true) }}:
+            - DeployInfrastructure
+          ${{ else }}:
+            []

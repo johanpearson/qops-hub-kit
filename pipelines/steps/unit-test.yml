@@ -1,0 +1,66 @@
+# Unit Test Step Template
+# Runs unit tests with coverage and publishes results
+
+parameters:
+  - name: workingDirectory
+    type: string
+    default: ''
+    displayName: 'Working directory (optional)'
+  
+  - name: testScript
+    type: string
+    default: 'npm run test:coverage'
+    displayName: 'Test script to run'
+  
+  - name: publishResults
+    type: boolean
+    default: true
+    displayName: 'Publish test results'
+  
+  - name: publishCoverage
+    type: boolean
+    default: true
+    displayName: 'Publish code coverage'
+
+steps:
+  - script: ${{ parameters.testScript }}
+    displayName: 'Run unit tests with coverage'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    condition: ne('${{ parameters.workingDirectory }}', '')
+
+  - script: ${{ parameters.testScript }}
+    displayName: 'Run unit tests with coverage'
+    condition: eq('${{ parameters.workingDirectory }}', '')
+
+  - ${{ if eq(parameters.publishResults, true) }}:
+    - task: PublishTestResults@2
+      displayName: 'Publish test results'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/junit.xml'
+        searchFolder: ${{ parameters.workingDirectory }}
+        failTaskOnFailedTests: true
+        testRunTitle: 'Unit Tests'
+        mergeTestResults: true
+
+  - ${{ if eq(parameters.publishCoverage, true) }}:
+    - task: PublishCodeCoverageResults@2
+      displayName: 'Publish code coverage'
+      condition: succeededOrFailed()
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '${{ parameters.workingDirectory }}/coverage/cobertura-coverage.xml'
+        reportDirectory: '${{ parameters.workingDirectory }}/coverage'
+        failIfCoverageEmpty: false
+      condition: and(succeededOrFailed(), ne('${{ parameters.workingDirectory }}', ''))
+
+    - task: PublishCodeCoverageResults@2
+      displayName: 'Publish code coverage'
+      condition: succeededOrFailed()
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '$(Build.SourcesDirectory)/coverage/cobertura-coverage.xml'
+        reportDirectory: '$(Build.SourcesDirectory)/coverage'
+        failIfCoverageEmpty: false
+      condition: and(succeededOrFailed(), eq('${{ parameters.workingDirectory }}', ''))

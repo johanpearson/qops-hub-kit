@@ -454,11 +454,44 @@ The pipeline:
 
 ---
 
+## Infrastructure & CI/CD Templates
+
+This repository includes **reusable infrastructure and pipeline templates** for deploying Azure Functions with cost-optimized resources.
+
+### 🏗️ Infrastructure Templates
+
+**Quick Start:**
+1. Run `azure-pipelines-common-resources.yml` to deploy shared Key Vault (once per environment)
+2. Use `infra/service.bicep` to deploy your Function App
+
+**Resources deployed:**
+- Serverless Azure Functions (Consumption plan Y1)
+- Storage Account (blob + table, Standard_LRS)
+- Key Vault for JWT secrets
+- Application Insights
+
+**Tags on all resources:** Project: QOPS, Owner: Johan Pearson
+
+👉 **[See Infrastructure Guide](./infra/README.md)** | **[Variable Groups Setup](./VARIABLE-GROUPS.md)**
+
+### 🚀 Pipeline Templates
+
+Reusable step, job, and stage templates for Azure DevOps.
+
+**Example:** See `pipelines/examples/function-app-pipeline.yml`
+
+👉 **[See Pipeline Documentation](./pipelines/README.md)**
+
+---
+
 ## Documentation
 
-### 📚 Detailed Guides
+### 📚 Guides
 
-- **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault, and more
+- **[Variable Groups Setup](./VARIABLE-GROUPS.md)** - How to configure Azure DevOps variable groups
+- **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault
+- **[Infrastructure](./infra/README.md)** - Bicep templates
+- **[Pipelines](./pipelines/README.md)** - Azure DevOps templates
 
 ## Best Practices
 

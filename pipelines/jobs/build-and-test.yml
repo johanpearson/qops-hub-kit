@@ -1,0 +1,106 @@
+# Build and Test Job Template
+# Complete job for building and testing Node.js application
+
+parameters:
+  - name: nodeVersion
+    type: string
+    default: '22.x'
+    displayName: 'Node.js version'
+  
+  - name: workingDirectory
+    type: string
+    default: ''
+    displayName: 'Working directory (optional)'
+  
+  - name: vmImage
+    type: string
+    default: 'ubuntu-latest'
+    displayName: 'VM image for build agent'
+  
+  - name: jobName
+    type: string
+    default: 'BuildAndTest'
+    displayName: 'Job name'
+  
+  - name: displayName
+    type: string
+    default: 'Build and Test'
+    displayName: 'Job display name'
+  
+  - name: runAutomatedTests
+    type: boolean
+    default: false
+    displayName: 'Run automated tests'
+  
+  - name: testRepoUrl
+    type: string
+    default: ''
+    displayName: 'Test repository URL (if running automated tests)'
+
+jobs:
+  - job: ${{ parameters.jobName }}
+    displayName: ${{ parameters.displayName }}
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    
+    steps:
+      # Checkout code
+      - checkout: self
+        displayName: 'Checkout source code'
+
+      # Prepare Node.js environment
+      - template: ../steps/prepare-node.yml
+        parameters:
+          nodeVersion: ${{ parameters.nodeVersion }}
+          workingDirectory: ${{ parameters.workingDirectory }}
+
+      # Type check
+      - ${{ if ne(parameters.workingDirectory, '') }}:
+        - script: npm run typecheck
+          displayName: 'Run type checking'
+          workingDirectory: ${{ parameters.workingDirectory }}
+      
+      - ${{ if eq(parameters.workingDirectory, '') }}:
+        - script: npm run typecheck
+          displayName: 'Run type checking'
+
+      # Build
+      - template: ../steps/build.yml
+        parameters:
+          workingDirectory: ${{ parameters.workingDirectory }}
+          buildScript: 'npm run build'
+
+      # Unit tests
+      - template: ../steps/unit-test.yml
+        parameters:
+          workingDirectory: ${{ parameters.workingDirectory }}
+          testScript: 'npm run test:coverage'
+          publishResults: true
+          publishCoverage: true
+
+      # Automated tests (optional)
+      - ${{ if and(eq(parameters.runAutomatedTests, true), ne(parameters.testRepoUrl, '')) }}:
+        - template: ../steps/automated-test.yml
+          parameters:
+            testRepoUrl: ${{ parameters.testRepoUrl }}
+            testScript: 'npm test'
+            publishResults: true
+
+      # Publish build artifacts
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish build artifacts'
+        condition: succeeded()
+        inputs:
+          PathtoPublish: '${{ parameters.workingDirectory }}/dist'
+          ArtifactName: 'drop'
+          publishLocation: 'Container'
+        condition: and(succeeded(), ne('${{ parameters.workingDirectory }}', ''))
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish build artifacts'
+        condition: succeeded()
+        inputs:
+          PathtoPublish: '$(Build.SourcesDirectory)/dist'
+          ArtifactName: 'drop'
+          publishLocation: 'Container'
+        condition: and(succeeded(), eq('${{ parameters.workingDirectory }}', ''))

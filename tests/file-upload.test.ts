@@ -3,6 +3,7 @@ import { HttpRequest, InvocationContext } from '@azure/functions';
 import { z } from 'zod';
 import { createHandler } from '../src/handler';
 import { ErrorCode } from '../src/errors';
+// File class is available in Node.js 18+ from the buffer module
 import { File } from 'buffer';
 
 describe('file upload', () => {

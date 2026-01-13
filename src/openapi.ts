@@ -146,24 +146,28 @@ export class OpenApiBuilder {
 
       // Add form fields from schema
       if (route.formFieldsSchema) {
-        const shape = route.formFieldsSchema.shape || route.formFieldsSchema._def?.shape?.();
+        const shape = route.formFieldsSchema.shape;
         if (shape) {
           for (const [key, zodType] of Object.entries(shape as Record<string, any>)) {
+            // Use safeParse to determine if field is required
+            const testResult = route.formFieldsSchema.safeParse({ [key]: undefined });
+            const isRequired = !testResult.success && testResult.error.issues.some((issue) => issue.path.includes(key));
+
             // Simple type mapping - extend as needed
             let type = 'string';
-            if (zodType._def?.typeName === 'ZodNumber') {
+            const typeName = (zodType as any)._def?.typeName;
+            if (typeName === 'ZodNumber') {
               type = 'number';
-            } else if (zodType._def?.typeName === 'ZodBoolean') {
+            } else if (typeName === 'ZodBoolean') {
               type = 'boolean';
             }
 
             properties[key] = {
               type,
-              description: zodType._def?.description || undefined,
+              description: (zodType as any)._def?.description || undefined,
             };
 
-            // Check if field is required (not optional)
-            if (!zodType._def?.typeName?.includes('Optional') && !zodType.isOptional?.()) {
+            if (isRequired) {
               required.push(key);
             }
           }

@@ -7,6 +7,7 @@ A lightweight utility package for creating Azure Function v4 APIs with TypeScrip
 ✅ **Simple Handler Wrapper** - Single function that handles all middleware  
 ✅ **JWT Authentication** - Built-in token verification with role-based access control  
 ✅ **Request Validation** - Type-safe validation using Zod schemas  
+✅ **File Upload Support** - Multipart/form-data parsing with automatic file extraction  
 ✅ **Error Handling** - Consistent error responses with HTTP status mapping  
 ✅ **Correlation IDs** - Automatic request tracking for distributed tracing  
 ✅ **OpenAPI Support** - Generate OpenAPI v3 documentation from Zod schemas  
@@ -263,6 +264,167 @@ const handler = createHandler(
 );
 // Response includes X-Correlation-ID header
 ```
+
+### 7. File Upload with Multipart/Form-Data
+
+Upload files with metadata using multipart/form-data requests, with automatic parsing and validation.
+
+**1. Define schemas for form data and response:**
+
+```typescript
+// src/schemas/upload.schemas.ts
+import { z } from '@qops/hub-kit';
+
+export const uploadFileSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional(),
+  category: z.enum(['document', 'image', 'other']).optional(),
+});
+
+export const uploadResponseSchema = z.object({
+  success: z.boolean(),
+  uploadedFiles: z.array(
+    z.object({
+      filename: z.string(),
+      size: z.number(),
+      mimeType: z.string(),
+    }),
+  ),
+});
+```
+
+**2. Create file upload handler:**
+
+```typescript
+// src/functions/upload-file.ts
+import { app } from '@azure/functions';
+import { createHandler } from '@qops/hub-kit';
+import { uploadFileSchema } from '../schemas/upload.schemas.js';
+
+const handler = createHandler(
+  async (request, context, { formData, files }) => {
+    // formData contains validated form fields
+    // files is an array of UploadedFile objects with:
+    //   - filename: original file name
+    //   - size: file size in bytes
+    //   - mimeType: MIME type (e.g., 'image/png')
+    //   - buffer: file content as Buffer
+    //   - fieldName: form field name
+
+    // Process uploaded files
+    for (const file of files || []) {
+      context.log(`Uploaded: ${file.filename} (${file.size} bytes)`);
+
+      // In production, upload to Azure Blob Storage:
+      // await uploadToBlob(file.buffer, file.filename);
+    }
+
+    return {
+      status: 200,
+      jsonBody: {
+        success: true,
+        uploadedFiles:
+          files?.map((f) => ({
+            filename: f.filename,
+            size: f.size,
+            mimeType: f.mimeType,
+          })) || [],
+      },
+    };
+  },
+  {
+    formDataSchema: uploadFileSchema,
+    enableLogging: true,
+  },
+);
+
+app.http('uploadFile', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'upload',
+  handler,
+});
+```
+
+**3. Add OpenAPI documentation for file upload:**
+
+```typescript
+// src/functions/openapi.ts
+import { app } from '@azure/functions';
+import { OpenApiBuilder } from '@qops/hub-kit';
+import { uploadFileSchema, uploadResponseSchema } from '../schemas/upload.schemas.js';
+
+const builder = new OpenApiBuilder({
+  title: 'My API',
+  version: '1.0.0',
+});
+
+builder.registerRoute({
+  method: 'POST',
+  path: '/api/upload',
+  summary: 'Upload file with metadata',
+  description: 'Upload one or more files using multipart/form-data',
+  tags: ['Files'],
+  formDataSchema: uploadFileSchema, // Form fields validation
+  fileUploads: {
+    // File upload fields
+    file: {
+      description: 'File(s) to upload (supports multiple files)',
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      description: 'Files uploaded successfully',
+      schema: uploadResponseSchema,
+    },
+    400: {
+      description: 'Invalid multipart/form-data',
+    },
+    422: {
+      description: 'Validation error',
+    },
+  },
+});
+
+app.http('openapi', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'openapi.json',
+  handler: async () => ({
+    status: 200,
+    jsonBody: builder.generateDocument(),
+  }),
+});
+```
+
+**4. Test file upload:**
+
+```bash
+# Single file upload
+curl -X POST http://localhost:7071/api/upload \
+  -F "title=My Document" \
+  -F "description=A test file" \
+  -F "category=document" \
+  -F "file=@/path/to/file.pdf"
+
+# Multiple files
+curl -X POST http://localhost:7071/api/upload \
+  -F "title=Multiple Files" \
+  -F "file=@/path/to/file1.txt" \
+  -F "file=@/path/to/file2.pdf"
+```
+
+**Key Features:**
+
+- ✅ **Automatic parsing** of multipart/form-data requests
+- ✅ **File metadata** available (filename, size, MIME type)
+- ✅ **Buffer access** for processing or uploading to storage
+- ✅ **Form field validation** using Zod schemas
+- ✅ **Multiple files** supported on the same field
+- ✅ **OpenAPI 3.0** documentation with proper `format: binary`
+
+> **Note:** File content is loaded into memory as a Buffer. For large files (>100MB), add file size validation to prevent memory issues.
 
 ---
 

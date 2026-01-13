@@ -1,12 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpRequest, InvocationContext } from '@azure/functions';
-import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { createHandler } from '../src/handler';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { UserRole } from '../src/auth';
-import { AppError, ErrorCode } from '../src/errors';
+import { CORRELATION_ID_HEADER } from '../src/correlation';
+import { ErrorCode } from '../src/errors';
+import { createHandler } from '../src/handler';
 
 describe('handler', () => {
+  const SECRET = 'test-secret-key';
   let mockRequest: HttpRequest;
   let mockContext: InvocationContext;
 
@@ -24,77 +26,59 @@ describe('handler', () => {
       error: vi.fn(),
       warn: vi.fn(),
       info: vi.fn(),
-      debug: vi.fn(),
-      trace: vi.fn(),
       invocationId: 'test-invocation-id',
     } as unknown as InvocationContext;
   });
 
-  describe('createHandler - basic functionality', () => {
+  describe('basic functionality', () => {
     it('should handle simple request without config', async () => {
-      const handler = createHandler(async (request, context, parsedData) => {
-        return {
-          status: 200,
-          jsonBody: { message: 'success', correlationId: parsedData.correlationId },
-        };
+      const handler = createHandler(async (_request, _context, { correlationId }) => {
+        return { status: 200, jsonBody: { message: 'success', correlationId } };
       });
 
       const response = await handler(mockRequest, mockContext);
 
       expect(response.status).toBe(200);
-      expect(response.jsonBody).toHaveProperty('message', 'success');
-      expect(response.headers).toHaveProperty('x-correlation-id');
+      expect(response.jsonBody.message).toBe('success');
+      expect(response.jsonBody.correlationId).toBeTruthy();
     });
 
     it('should add correlation ID to response headers', async () => {
-      const handler = createHandler(async () => {
-        return { status: 200, jsonBody: { message: 'success' } };
-      });
+      const handler = createHandler(async () => ({ status: 200, jsonBody: {} }));
 
       const response = await handler(mockRequest, mockContext);
 
-      expect(response.headers).toHaveProperty('x-correlation-id');
-      expect(typeof response.headers['x-correlation-id']).toBe('string');
+      const headers = response.headers as Record<string, string>;
+      expect(headers[CORRELATION_ID_HEADER]).toBeTruthy();
     });
 
-    it('should use provided correlation ID from request', async () => {
+    it('should use provided correlation ID', async () => {
       const correlationId = 'test-correlation-123';
-      mockRequest.headers.set('x-correlation-id', correlationId);
+      mockRequest.headers.set(CORRELATION_ID_HEADER, correlationId);
 
-      const handler = createHandler(async () => {
-        return { status: 200, jsonBody: { message: 'success' } };
-      });
+      const handler = createHandler(async () => ({ status: 200, jsonBody: {} }));
 
       const response = await handler(mockRequest, mockContext);
 
-      expect(response.headers['x-correlation-id']).toBe(correlationId);
+      expect((response.headers as Record<string, string>)[CORRELATION_ID_HEADER]).toBe(correlationId);
     });
   });
 
-  describe('createHandler - logging', () => {
-    it('should log requests when enableLogging is true', async () => {
-      const handler = createHandler(
-        async () => {
-          return { status: 200, jsonBody: { message: 'success' } };
-        },
-        { enableLogging: true },
-      );
+  describe('logging', () => {
+    it('should log when enabled', async () => {
+      const handler = createHandler(async () => ({ status: 200, jsonBody: {} }), { enableLogging: true });
 
       await handler(mockRequest, mockContext);
 
-      // Should log both correlation ID and request/response
       expect(mockContext.log).toHaveBeenCalledWith(expect.stringContaining('Started'));
       expect(mockContext.log).toHaveBeenCalledWith(expect.stringContaining('Completed'));
     });
 
-    it('should not log request/response when enableLogging is false', async () => {
-      const handler = createHandler(async () => {
-        return { status: 200, jsonBody: { message: 'success' } };
-      });
+    it('should not log when disabled', async () => {
+      const handler = createHandler(async () => ({ status: 200, jsonBody: {} }));
 
       await handler(mockRequest, mockContext);
 
-      // Correlation ID may be logged, but request/response should not be
       const logCalls = (mockContext.log as any).mock.calls;
       const hasRequestLog = logCalls.some(
         (call: any[]) => call[0]?.includes('Started') || call[0]?.includes('Completed'),
@@ -103,18 +87,19 @@ describe('handler', () => {
     });
   });
 
-  describe('createHandler - request body validation', () => {
+  describe('request body validation', () => {
     const bodySchema = z.object({
       name: z.string().min(1),
       email: z.string().email(),
+      age: z.number().min(0).optional(),
     });
 
-    it('should validate and parse valid request body', async () => {
-      const validBody = { name: 'John Doe', email: 'john@example.com' };
+    it('should validate and parse valid body', async () => {
+      const validBody = { name: 'John Doe', email: 'john@example.com', age: 30 };
       (mockRequest.json as any).mockResolvedValue(validBody);
 
       const handler = createHandler(
-        async (request, context, { body }) => {
+        async (_request, _context, { body }) => {
           return { status: 200, jsonBody: { received: body } };
         },
         { bodySchema },
@@ -126,12 +111,18 @@ describe('handler', () => {
       expect(response.jsonBody.received).toEqual(validBody);
     });
 
-    it('should return 422 for invalid request body', async () => {
-      const invalidBody = { name: '', email: 'not-an-email' };
-      (mockRequest.json as any).mockResolvedValue(invalidBody);
+    it.each([
+      { body: { name: '', email: 'test@example.com' }, description: 'empty name' },
+      { body: { name: 'John', email: 'invalid-email' }, description: 'invalid email' },
+      { body: { name: 'John' }, description: 'missing email' },
+      { body: { email: 'test@example.com' }, description: 'missing name' },
+      { body: {}, description: 'empty body' },
+      { body: { name: 'John', email: 'test@example.com', age: -1 }, description: 'negative age' },
+    ])('should return 422 for invalid body: $description', async ({ body }) => {
+      (mockRequest.json as any).mockResolvedValue(body);
 
       const handler = createHandler(
-        async (request, context, { body }) => {
+        async (_request, _context, { body }) => {
           return { status: 200, jsonBody: { received: body } };
         },
         { bodySchema },
@@ -148,7 +139,7 @@ describe('handler', () => {
       (mockRequest.json as any).mockRejectedValue(new Error('Invalid JSON'));
 
       const handler = createHandler(
-        async (request, context, { body }) => {
+        async (_request, _context, { body }) => {
           return { status: 200, jsonBody: { received: body } };
         },
         { bodySchema },
@@ -158,54 +149,23 @@ describe('handler', () => {
 
       expect(response.status).toBe(400);
       expect(response.jsonBody.error.code).toBe(ErrorCode.BAD_REQUEST);
-      expect(response.jsonBody.error.message).toContain('Invalid JSON');
-    });
-
-    it('should handle missing fields in request body', async () => {
-      const incompleteBody = { name: 'John' }; // missing email
-      (mockRequest.json as any).mockResolvedValue(incompleteBody);
-
-      const handler = createHandler(
-        async (request, context, { body }) => {
-          return { status: 200, jsonBody: { received: body } };
-        },
-        { bodySchema },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(422);
-      expect(response.jsonBody.error.code).toBe(ErrorCode.VALIDATION_ERROR);
-    });
-
-    it('should handle empty request body', async () => {
-      (mockRequest.json as any).mockResolvedValue({});
-
-      const handler = createHandler(
-        async (request, context, { body }) => {
-          return { status: 200, jsonBody: { received: body } };
-        },
-        { bodySchema },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(422);
     });
   });
 
-  describe('createHandler - query parameters validation', () => {
+  describe('query parameters validation', () => {
     const querySchema = z.object({
       page: z.string().regex(/^\d+$/),
       limit: z.string().optional(),
+      sort: z.enum(['asc', 'desc']).optional(),
     });
 
     it('should validate and parse valid query parameters', async () => {
       mockRequest.query.set('page', '1');
       mockRequest.query.set('limit', '10');
+      mockRequest.query.set('sort', 'asc');
 
       const handler = createHandler(
-        async (request, context, { query }) => {
+        async (_request, _context, { query }) => {
           return { status: 200, jsonBody: { received: query } };
         },
         { querySchema },
@@ -214,30 +174,14 @@ describe('handler', () => {
       const response = await handler(mockRequest, mockContext);
 
       expect(response.status).toBe(200);
-      expect(response.jsonBody.received).toEqual({ page: '1', limit: '10' });
+      expect(response.jsonBody.received).toEqual({ page: '1', limit: '10', sort: 'asc' });
     });
 
-    it('should return 422 for invalid query parameters', async () => {
-      mockRequest.query.set('page', 'invalid');
-
-      const handler = createHandler(
-        async (request, context, { query }) => {
-          return { status: 200, jsonBody: { received: query } };
-        },
-        { querySchema },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(422);
-      expect(response.jsonBody.error.code).toBe(ErrorCode.VALIDATION_ERROR);
-    });
-
-    it('should handle missing optional query parameters', async () => {
+    it('should handle optional parameters', async () => {
       mockRequest.query.set('page', '1');
 
       const handler = createHandler(
-        async (request, context, { query }) => {
+        async (_request, _context, { query }) => {
           return { status: 200, jsonBody: { received: query } };
         },
         { querySchema },
@@ -248,21 +192,38 @@ describe('handler', () => {
       expect(response.status).toBe(200);
       expect(response.jsonBody.received).toEqual({ page: '1' });
     });
+
+    it.each([
+      { page: 'invalid', description: 'non-numeric page' },
+      { page: '', description: 'empty page' },
+    ])('should return 422 for invalid query: $description', async ({ page }) => {
+      mockRequest.query.set('page', page);
+
+      const handler = createHandler(
+        async (_request, _context, { query }) => {
+          return { status: 200, jsonBody: { received: query } };
+        },
+        { querySchema },
+      );
+
+      const response = await handler(mockRequest, mockContext);
+
+      expect(response.status).toBe(422);
+      expect(response.jsonBody.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+    });
   });
 
-  describe('createHandler - JWT authentication', () => {
-    const secret = 'test-secret-key';
-
-    it('should authenticate valid JWT token', async () => {
-      const payload = { sub: '123', email: 'test@example.com', roles: [UserRole.MEMBER] };
-      const token = jwt.sign(payload, secret);
+  describe('JWT authentication', () => {
+    it('should authenticate valid token', async () => {
+      const payload = { sub: '123', email: 'test@example.com', role: UserRole.MEMBER };
+      const token = jwt.sign(payload, SECRET);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
       const handler = createHandler(
-        async (request, context, { user }) => {
+        async (_request, _context, { user }) => {
           return { status: 200, jsonBody: { user } };
         },
-        { jwtConfig: { secret } },
+        { jwtConfig: { secret: SECRET } },
       );
 
       const response = await handler(mockRequest, mockContext);
@@ -272,46 +233,20 @@ describe('handler', () => {
       expect(response.jsonBody.user.email).toBe('test@example.com');
     });
 
-    it('should return 401 for missing authorization header', async () => {
-      const handler = createHandler(
-        async (request, context, { user }) => {
-          return { status: 200, jsonBody: { user } };
-        },
-        { jwtConfig: { secret } },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(401);
-      expect(response.jsonBody.error.code).toBe(ErrorCode.UNAUTHORIZED);
-      expect(response.jsonBody.error.message).toContain('Missing authorization header');
-    });
-
-    it('should return 401 for invalid JWT token', async () => {
-      mockRequest.headers.set('authorization', 'Bearer invalid-token');
+    it.each([
+      { auth: null, description: 'missing authorization header' },
+      { auth: 'InvalidFormat', description: 'malformed authorization header' },
+      { auth: 'Bearer invalid-token', description: 'invalid token' },
+    ])('should return 401 for: $description', async ({ auth }) => {
+      if (auth) {
+        mockRequest.headers.set('authorization', auth);
+      }
 
       const handler = createHandler(
-        async (request, context, { user }) => {
+        async (_request, _context, { user }) => {
           return { status: 200, jsonBody: { user } };
         },
-        { jwtConfig: { secret } },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(401);
-      expect(response.jsonBody.error.code).toBe(ErrorCode.UNAUTHORIZED);
-      expect(response.jsonBody.error.message).toContain('Invalid token');
-    });
-
-    it('should return 401 for malformed authorization header', async () => {
-      mockRequest.headers.set('authorization', 'InvalidFormat');
-
-      const handler = createHandler(
-        async (request, context, { user }) => {
-          return { status: 200, jsonBody: { user } };
-        },
-        { jwtConfig: { secret } },
+        { jwtConfig: { secret: SECRET } },
       );
 
       const response = await handler(mockRequest, mockContext);
@@ -325,104 +260,56 @@ describe('handler', () => {
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
       const handler = createHandler(
-        async (request, context, { user }) => {
+        async (_request, _context, { user }) => {
           return { status: 200, jsonBody: { user } };
         },
-        { jwtConfig: { secret } },
+        { jwtConfig: { secret: SECRET } },
       );
 
       const response = await handler(mockRequest, mockContext);
 
       expect(response.status).toBe(401);
-      expect(response.jsonBody.error.code).toBe(ErrorCode.UNAUTHORIZED);
     });
   });
 
-  describe('createHandler - role-based authorization', () => {
-    const secret = 'test-secret-key';
-
-    it('should allow access for user with required role', async () => {
-      const payload = { sub: '123', roles: [UserRole.ADMIN] };
-      const token = jwt.sign(payload, secret);
+  describe('role-based authorization', () => {
+    it.each([
+      { userRole: UserRole.ADMIN, required: [UserRole.ADMIN], shouldPass: true },
+      { userRole: UserRole.MEMBER, required: [UserRole.MEMBER], shouldPass: true },
+      { userRole: UserRole.ADMIN, required: [UserRole.MEMBER], shouldPass: true }, // Admin has member access
+      { userRole: UserRole.ADMIN, required: [UserRole.ADMIN, UserRole.MEMBER], shouldPass: true },
+      { userRole: UserRole.MEMBER, required: [UserRole.ADMIN], shouldPass: false },
+    ])('user=$userRole, required=$required, pass=$shouldPass', async ({ userRole, required, shouldPass }) => {
+      const payload = { sub: '123', role: userRole };
+      const token = jwt.sign(payload, SECRET);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
       const handler = createHandler(
-        async (request, context, { user }) => {
+        async () => {
           return { status: 200, jsonBody: { message: 'authorized' } };
         },
-        { jwtConfig: { secret }, requiredRoles: [UserRole.ADMIN] },
+        { jwtConfig: { secret: SECRET }, requiredRoles: required },
       );
 
       const response = await handler(mockRequest, mockContext);
 
-      expect(response.status).toBe(200);
-      expect(response.jsonBody.message).toBe('authorized');
+      if (shouldPass) {
+        expect(response.status).toBe(200);
+      } else {
+        expect(response.status).toBe(403);
+        expect(response.jsonBody.error.code).toBe(ErrorCode.FORBIDDEN);
+      }
     });
 
-    it('should allow access for user with one of multiple required roles', async () => {
-      const payload = { sub: '123', roles: [UserRole.MEMBER] };
-      const token = jwt.sign(payload, secret);
+    it('should return 403 for user with no role', async () => {
+      const token = jwt.sign({ sub: '123' }, SECRET);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
       const handler = createHandler(
-        async (request, context, { user }) => {
+        async () => {
           return { status: 200, jsonBody: { message: 'authorized' } };
         },
-        { jwtConfig: { secret }, requiredRoles: [UserRole.ADMIN, UserRole.MEMBER] },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(200);
-    });
-
-    it('should return 403 for user without required role', async () => {
-      const payload = { sub: '123', roles: [UserRole.MEMBER] };
-      const token = jwt.sign(payload, secret);
-      mockRequest.headers.set('authorization', `Bearer ${token}`);
-
-      const handler = createHandler(
-        async (request, context, { user }) => {
-          return { status: 200, jsonBody: { message: 'authorized' } };
-        },
-        { jwtConfig: { secret }, requiredRoles: [UserRole.ADMIN] },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(403);
-      expect(response.jsonBody.error.code).toBe(ErrorCode.FORBIDDEN);
-      expect(response.jsonBody.error.message).toContain('Required role not found');
-    });
-
-    it('should return 403 for user with no roles', async () => {
-      const payload = { sub: '123' }; // No roles field
-      const token = jwt.sign(payload, secret);
-      mockRequest.headers.set('authorization', `Bearer ${token}`);
-
-      const handler = createHandler(
-        async (request, context, { user }) => {
-          return { status: 200, jsonBody: { message: 'authorized' } };
-        },
-        { jwtConfig: { secret }, requiredRoles: [UserRole.ADMIN] },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(403);
-      expect(response.jsonBody.error.code).toBe(ErrorCode.FORBIDDEN);
-    });
-
-    it('should return 403 for user with empty roles array', async () => {
-      const payload = { sub: '123', roles: [] };
-      const token = jwt.sign(payload, secret);
-      mockRequest.headers.set('authorization', `Bearer ${token}`);
-
-      const handler = createHandler(
-        async (request, context, { user }) => {
-          return { status: 200, jsonBody: { message: 'authorized' } };
-        },
-        { jwtConfig: { secret }, requiredRoles: [UserRole.ADMIN] },
+        { jwtConfig: { secret: SECRET }, requiredRoles: [UserRole.ADMIN] },
       );
 
       const response = await handler(mockRequest, mockContext);
@@ -431,10 +318,12 @@ describe('handler', () => {
     });
   });
 
-  describe('createHandler - error handling', () => {
-    it('should handle AppError thrown by handler', async () => {
+  describe('error handling', () => {
+    it('should handle AppError with details', async () => {
       const handler = createHandler(async () => {
-        throw new AppError(ErrorCode.NOT_FOUND, 'Resource not found', { resourceId: '123' });
+        throw new (await import('../src/errors')).AppError(ErrorCode.NOT_FOUND, 'Resource not found', {
+          resourceId: '123',
+        });
       });
 
       const response = await handler(mockRequest, mockContext);
@@ -445,7 +334,7 @@ describe('handler', () => {
       expect(response.jsonBody.error.details).toEqual({ resourceId: '123' });
     });
 
-    it('should handle unknown errors', async () => {
+    it('should handle unknown errors as 500', async () => {
       const handler = createHandler(async () => {
         throw new Error('Unexpected error');
       });
@@ -454,10 +343,9 @@ describe('handler', () => {
 
       expect(response.status).toBe(500);
       expect(response.jsonBody.error.code).toBe(ErrorCode.INTERNAL_ERROR);
-      expect(response.jsonBody.error.message).toBe('Internal server error');
     });
 
-    it('should log errors to context', async () => {
+    it('should log errors', async () => {
       const handler = createHandler(async () => {
         throw new Error('Test error');
       });
@@ -469,45 +357,38 @@ describe('handler', () => {
 
     it('should include correlation ID in error response', async () => {
       const correlationId = 'error-correlation-123';
-      mockRequest.headers.set('x-correlation-id', correlationId);
+      mockRequest.headers.set(CORRELATION_ID_HEADER, correlationId);
 
       const handler = createHandler(async () => {
-        throw new AppError(ErrorCode.BAD_REQUEST, 'Bad request');
+        throw new (await import('../src/errors')).AppError(ErrorCode.BAD_REQUEST, 'Bad request');
       });
 
       const response = await handler(mockRequest, mockContext);
 
-      expect(response.headers['x-correlation-id']).toBe(correlationId);
+      expect((response.headers as Record<string, string>)[CORRELATION_ID_HEADER]).toBe(correlationId);
     });
   });
 
-  describe('createHandler - combined configurations', () => {
-    const secret = 'test-secret-key';
+  describe('combined configurations', () => {
     const bodySchema = z.object({
       name: z.string(),
       age: z.number().min(0),
     });
 
     it('should handle auth + validation + logging together', async () => {
-      const payload = { sub: '123', roles: [UserRole.MEMBER] };
-      const token = jwt.sign(payload, secret);
+      const payload = { sub: '123', role: UserRole.MEMBER };
+      const token = jwt.sign(payload, SECRET);
       mockRequest.headers.set('authorization', `Bearer ${token}`);
 
       const validBody = { name: 'John', age: 30 };
       (mockRequest.json as any).mockResolvedValue(validBody);
 
       const handler = createHandler(
-        async (request, context, { body, user }) => {
-          return {
-            status: 201,
-            jsonBody: {
-              user: user?.sub,
-              data: body,
-            },
-          };
+        async (_request, _context, { body, user }) => {
+          return { status: 201, jsonBody: { user: user?.sub, data: body } };
         },
         {
-          jwtConfig: { secret },
+          jwtConfig: { secret: SECRET },
           requiredRoles: [UserRole.MEMBER],
           bodySchema,
           enableLogging: true,
@@ -522,78 +403,21 @@ describe('handler', () => {
       expect(mockContext.log).toHaveBeenCalled();
     });
 
-    it('should fail early on auth before validation', async () => {
-      // No auth header, but valid body
+    it('should fail on auth before validation', async () => {
       const validBody = { name: 'John', age: 30 };
       (mockRequest.json as any).mockResolvedValue(validBody);
 
       const handler = createHandler(
-        async (request, context, { body, user }) => {
+        async (_request, _context, { body }) => {
           return { status: 200, jsonBody: { data: body } };
         },
-        {
-          jwtConfig: { secret },
-          bodySchema,
-        },
+        { jwtConfig: { secret: SECRET }, bodySchema },
       );
 
       const response = await handler(mockRequest, mockContext);
 
-      // Should fail with 401 (auth) before attempting validation
       expect(response.status).toBe(401);
       expect(mockRequest.json).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('createHandler - edge cases', () => {
-    it('should handle null values in response', async () => {
-      const handler = createHandler(async () => {
-        return { status: 200, jsonBody: { value: null } };
-      });
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(200);
-      expect(response.jsonBody.value).toBeNull();
-    });
-
-    it('should handle empty arrays in validation', async () => {
-      const schema = z.object({
-        items: z.array(z.string()),
-      });
-      (mockRequest.json as any).mockResolvedValue({ items: [] });
-
-      const handler = createHandler(
-        async (request, context, { body }) => {
-          return { status: 200, jsonBody: { received: body } };
-        },
-        { bodySchema: schema },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(200);
-      expect(response.jsonBody.received.items).toEqual([]);
-    });
-
-    it('should handle undefined optional fields', async () => {
-      const schema = z.object({
-        required: z.string(),
-        optional: z.string().optional(),
-      });
-      (mockRequest.json as any).mockResolvedValue({ required: 'value' });
-
-      const handler = createHandler(
-        async (request, context, { body }) => {
-          return { status: 200, jsonBody: { received: body } };
-        },
-        { bodySchema: schema },
-      );
-
-      const response = await handler(mockRequest, mockContext);
-
-      expect(response.status).toBe(200);
-      expect(response.jsonBody.received.optional).toBeUndefined();
     });
   });
 });

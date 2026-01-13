@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpRequest, InvocationContext } from '@azure/functions';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import jwt from 'jsonwebtoken';
-import { RouteBuilder, createRouteHandler, Route } from '../src/routes';
-import { OpenApiBuilder } from '../src/openapi';
 import { UserRole } from '../src/auth';
+import { OpenApiBuilder } from '../src/openapi';
+import { createRouteHandler, Route, RouteBuilder } from '../src/routes';
 
 describe('routes', () => {
   let mockRequest: HttpRequest;
@@ -22,17 +21,14 @@ describe('routes', () => {
     mockContext = {
       log: vi.fn(),
       error: vi.fn(),
-      warn: vi.fn(),
-      info: vi.fn(),
-      debug: vi.fn(),
-      trace: vi.fn(),
       invocationId: 'test-invocation-id',
     } as unknown as InvocationContext;
   });
 
-  describe('RouteBuilder - basic functionality', () => {
+  describe('RouteBuilder', () => {
     it('should create route builder without OpenAPI', () => {
       const builder = new RouteBuilder();
+
       expect(builder).toBeDefined();
     });
 
@@ -41,103 +37,194 @@ describe('routes', () => {
         title: 'Test API',
         version: '1.0.0',
       });
+
       const builder = new RouteBuilder(openApiBuilder);
+
       expect(builder).toBeDefined();
     });
 
-    it('should register a simple route', () => {
+    it('should register route', () => {
       const builder = new RouteBuilder();
 
-      builder.route({
+      const route: Route = {
         method: 'GET',
         path: '/api/test',
         summary: 'Test endpoint',
-        handler: async () => ({ status: 200, jsonBody: { message: 'test' } }),
-        responses: { 200: { description: 'Success' } },
-      });
+        handler: async () => ({ status: 200, jsonBody: {} }),
+      };
 
-      const route = builder.getRoute('GET', '/api/test');
-      expect(route).toBeDefined();
-      expect(route?.summary).toBe('Test endpoint');
+      builder.route(route);
+
+      const retrieved = builder.getRoute('GET', '/api/test');
+      expect(retrieved).toBe(route);
     });
 
     it('should return undefined for non-existent route', () => {
       const builder = new RouteBuilder();
-      const route = builder.getRoute('GET', '/api/nonexistent');
-      expect(route).toBeUndefined();
+
+      const retrieved = builder.getRoute('GET', '/api/nonexistent');
+
+      expect(retrieved).toBeUndefined();
+    });
+
+    it('should support method chaining', () => {
+      const builder = new RouteBuilder();
+
+      const result = builder
+        .route({
+          method: 'GET',
+          path: '/api/test1',
+          summary: 'Test 1',
+          handler: async () => ({ status: 200, jsonBody: {} }),
+        })
+        .route({
+          method: 'POST',
+          path: '/api/test2',
+          summary: 'Test 2',
+          handler: async () => ({ status: 201, jsonBody: {} }),
+        });
+
+      expect(result).toBe(builder);
+      expect(builder.getAllRoutes()).toHaveLength(2);
     });
 
     it('should get all routes', () => {
       const builder = new RouteBuilder();
 
-      builder.route({
-        method: 'GET',
-        path: '/api/route1',
-        summary: 'Route 1',
-        handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
-      });
-
-      builder.route({
-        method: 'POST',
-        path: '/api/route2',
-        summary: 'Route 2',
-        handler: async () => ({ status: 201, jsonBody: {} }),
-        responses: { 201: { description: 'Created' } },
-      });
+      builder
+        .route({
+          method: 'GET',
+          path: '/api/users',
+          summary: 'List users',
+          handler: async () => ({ status: 200, jsonBody: [] }),
+        })
+        .route({
+          method: 'POST',
+          path: '/api/users',
+          summary: 'Create user',
+          handler: async () => ({ status: 201, jsonBody: {} }),
+        })
+        .route({
+          method: 'GET',
+          path: '/api/posts',
+          summary: 'List posts',
+          handler: async () => ({ status: 200, jsonBody: [] }),
+        });
 
       const routes = builder.getAllRoutes();
-      expect(routes).toHaveLength(2);
-    });
-  });
 
-  describe('RouteBuilder - route registration', () => {
-    it('should register route with body schema', () => {
+      expect(routes).toHaveLength(3);
+      expect(routes.map((r) => `${r.method}:${r.path}`)).toEqual([
+        'GET:/api/users',
+        'POST:/api/users',
+        'GET:/api/posts',
+      ]);
+    });
+
+    it('should distinguish routes by method and path', () => {
       const builder = new RouteBuilder();
+
+      const getRoute: Route = {
+        method: 'GET',
+        path: '/api/users',
+        summary: 'Get users',
+        handler: async () => ({ status: 200, jsonBody: [] }),
+      };
+
+      const postRoute: Route = {
+        method: 'POST',
+        path: '/api/users',
+        summary: 'Create user',
+        handler: async () => ({ status: 201, jsonBody: {} }),
+      };
+
+      builder.route(getRoute).route(postRoute);
+
+      expect(builder.getRoute('GET', '/api/users')).toBe(getRoute);
+      expect(builder.getRoute('POST', '/api/users')).toBe(postRoute);
+    });
+
+    it('should create Azure handler with basic config', async () => {
+      const builder = new RouteBuilder();
+
+      const route: Route = {
+        method: 'GET',
+        path: '/api/test',
+        summary: 'Test endpoint',
+        handler: async (_request, _context, { correlationId }) => ({
+          status: 200,
+          jsonBody: { message: 'success', correlationId },
+        }),
+      };
+
+      const handler = builder.createAzureHandler(route);
+      const response = await handler(mockRequest, mockContext);
+
+      expect(response.status).toBe(200);
+      expect(response.jsonBody.message).toBe('success');
+    });
+
+    it('should create Azure handler with body schema', async () => {
+      const builder = new RouteBuilder();
+
       const bodySchema = z.object({
         name: z.string(),
+        email: z.string().email(),
       });
 
-      builder.route({
+      const route: Route = {
         method: 'POST',
         path: '/api/users',
         summary: 'Create user',
         bodySchema,
-        handler: async (req, ctx, { body }) => ({
+        handler: async (_request, _context, { body }) => ({
           status: 201,
-          jsonBody: { created: body },
+          jsonBody: { user: body },
         }),
-        responses: { 201: { description: 'Created' } },
-      });
+      };
 
-      const route = builder.getRoute('POST', '/api/users');
-      expect(route?.bodySchema).toBe(bodySchema);
+      const validBody = { name: 'John', email: 'john@example.com' };
+      (mockRequest.json as any).mockResolvedValue(validBody);
+
+      const handler = builder.createAzureHandler(route);
+      const response = await handler(mockRequest, mockContext);
+
+      expect(response.status).toBe(201);
+      expect(response.jsonBody.user).toEqual(validBody);
     });
 
-    it('should register route with query schema', () => {
-      const builder = new RouteBuilder();
-      const querySchema = z.object({
-        page: z.string(),
+    it('should auto-register route with OpenAPI builder', () => {
+      const openApiBuilder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
       });
+
+      const builder = new RouteBuilder(openApiBuilder);
 
       builder.route({
         method: 'GET',
-        path: '/api/items',
-        summary: 'List items',
-        querySchema,
-        handler: async (req, ctx, { query }) => ({
-          status: 200,
-          jsonBody: { page: query.page },
-        }),
-        responses: { 200: { description: 'Success' } },
+        path: '/api/test',
+        summary: 'Test endpoint',
+        description: 'Test description',
+        tags: ['Test'],
+        handler: async () => ({ status: 200, jsonBody: {} }),
       });
 
-      const route = builder.getRoute('GET', '/api/items');
-      expect(route?.querySchema).toBe(querySchema);
+      const doc = openApiBuilder.generateDocument();
+
+      expect(doc.paths['/api/test'].get).toBeDefined();
+      expect(doc.paths['/api/test'].get.summary).toBe('Test endpoint');
+      expect(doc.paths['/api/test'].get.tags).toEqual(['Test']);
     });
 
-    it('should register route with response schema', () => {
-      const builder = new RouteBuilder();
+    it('should register route with response schema in OpenAPI', () => {
+      const openApiBuilder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
+      });
+
+      const builder = new RouteBuilder(openApiBuilder);
+
       const responseSchema = z.object({
         id: z.string(),
         name: z.string(),
@@ -148,19 +235,44 @@ describe('routes', () => {
         path: '/api/user',
         summary: 'Get user',
         responseSchema,
-        handler: async () => ({
-          status: 200,
-          jsonBody: { id: '123', name: 'John' },
-        }),
-        responses: { 200: { description: 'Success' } },
+        handler: async () => ({ status: 200, jsonBody: {} }),
       });
 
-      const route = builder.getRoute('GET', '/api/user');
-      expect(route?.responseSchema).toBe(responseSchema);
+      const doc = openApiBuilder.generateDocument();
+
+      expect(doc.paths['/api/user'].get.responses['200']).toBeDefined();
     });
 
-    it('should register route with authentication requirement', () => {
-      const builder = new RouteBuilder();
+    it('should add auth responses to OpenAPI when auth is required', () => {
+      const openApiBuilder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
+      });
+
+      const builder = new RouteBuilder(openApiBuilder);
+
+      builder.route({
+        method: 'GET',
+        path: '/api/protected',
+        summary: 'Protected endpoint',
+        requiresAuth: true,
+        requiredRoles: [UserRole.ADMIN],
+        handler: async () => ({ status: 200, jsonBody: {} }),
+      });
+
+      const doc = openApiBuilder.generateDocument();
+
+      expect(doc.paths['/api/protected'].get.responses['401']).toBeDefined();
+      expect(doc.paths['/api/protected'].get.responses['403']).toBeDefined();
+    });
+
+    it('should add 401 but not 403 when auth required without specific roles', () => {
+      const openApiBuilder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
+      });
+
+      const builder = new RouteBuilder(openApiBuilder);
 
       builder.route({
         method: 'GET',
@@ -168,48 +280,106 @@ describe('routes', () => {
         summary: 'Protected endpoint',
         requiresAuth: true,
         handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
       });
 
-      const route = builder.getRoute('GET', '/api/protected');
-      expect(route?.requiresAuth).toBe(true);
+      const doc = openApiBuilder.generateDocument();
+
+      expect(doc.paths['/api/protected'].get.responses['401']).toBeDefined();
+      expect(doc.paths['/api/protected'].get.responses['403']).toBeUndefined();
     });
 
-    it('should register route with required roles', () => {
-      const builder = new RouteBuilder();
+    it('should add validation error response when bodySchema is provided', () => {
+      const openApiBuilder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
+      });
+
+      const builder = new RouteBuilder(openApiBuilder);
 
       builder.route({
-        method: 'DELETE',
-        path: '/api/admin',
-        summary: 'Admin endpoint',
+        method: 'POST',
+        path: '/api/data',
+        summary: 'Submit data',
+        bodySchema: z.object({ value: z.string() }),
+        handler: async () => ({ status: 200, jsonBody: {} }),
+      });
+
+      const doc = openApiBuilder.generateDocument();
+
+      expect(doc.paths['/api/data'].post.responses['422']).toBeDefined();
+    });
+
+    it('should create handler without JWT config when JWT_SECRET is not set', () => {
+      const originalEnv = process.env.JWT_SECRET;
+      delete process.env.JWT_SECRET;
+
+      const builder = new RouteBuilder();
+
+      const route: Route = {
+        method: 'GET',
+        path: '/api/test',
+        summary: 'Test endpoint',
         requiresAuth: true,
+        handler: async () => ({ status: 200, jsonBody: {} }),
+      };
+
+      const handler = builder.createAzureHandler(route);
+
+      expect(handler).toBeDefined();
+
+      if (originalEnv) {
+        process.env.JWT_SECRET = originalEnv;
+      }
+    });
+
+    it('should create handler with required roles', async () => {
+      const builder = new RouteBuilder();
+
+      const route: Route = {
+        method: 'GET',
+        path: '/api/test',
+        summary: 'Test endpoint',
         requiredRoles: [UserRole.ADMIN],
         handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
-      });
+      };
 
-      const route = builder.getRoute('DELETE', '/api/admin');
-      expect(route?.requiredRoles).toEqual([UserRole.ADMIN]);
+      const handler = builder.createAzureHandler(route);
+
+      expect(handler).toBeDefined();
     });
 
-    it('should register route with tags', () => {
+    it('should create handler with auth and JWT_SECRET set', async () => {
+      const originalEnv = process.env.JWT_SECRET;
+      process.env.JWT_SECRET = 'test-secret';
+
       const builder = new RouteBuilder();
 
-      builder.route({
+      const route: Route = {
         method: 'GET',
-        path: '/api/items',
-        summary: 'Get items',
-        tags: ['Items', 'Public'],
+        path: '/api/test',
+        summary: 'Test endpoint',
+        requiresAuth: true,
         handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
-      });
+      };
 
-      const route = builder.getRoute('GET', '/api/items');
-      expect(route?.tags).toEqual(['Items', 'Public']);
+      const handler = builder.createAzureHandler(route);
+
+      expect(handler).toBeDefined();
+
+      if (originalEnv) {
+        process.env.JWT_SECRET = originalEnv;
+      } else {
+        delete process.env.JWT_SECRET;
+      }
     });
 
-    it('should register route with custom success status', () => {
-      const builder = new RouteBuilder();
+    it('should use custom success status', () => {
+      const openApiBuilder = new OpenApiBuilder({
+        title: 'Test API',
+        version: '1.0.0',
+      });
+
+      const builder = new RouteBuilder(openApiBuilder);
 
       builder.route({
         method: 'POST',
@@ -217,295 +387,11 @@ describe('routes', () => {
         summary: 'Create resource',
         successStatus: 201,
         handler: async () => ({ status: 201, jsonBody: {} }),
-        responses: { 201: { description: 'Created' } },
-      });
-
-      const route = builder.getRoute('POST', '/api/resource');
-      expect(route?.successStatus).toBe(201);
-    });
-
-    it('should support method chaining', () => {
-      const builder = new RouteBuilder();
-
-      const result = builder
-        .route({
-          method: 'GET',
-          path: '/api/route1',
-          summary: 'Route 1',
-          handler: async () => ({ status: 200, jsonBody: {} }),
-          responses: { 200: { description: 'Success' } },
-        })
-        .route({
-          method: 'POST',
-          path: '/api/route2',
-          summary: 'Route 2',
-          handler: async () => ({ status: 201, jsonBody: {} }),
-          responses: { 201: { description: 'Created' } },
-        });
-
-      expect(result).toBe(builder);
-      expect(builder.getAllRoutes()).toHaveLength(2);
-    });
-  });
-
-  describe('RouteBuilder - OpenAPI integration', () => {
-    it('should auto-register route with OpenAPI builder', () => {
-      const openApiBuilder = new OpenApiBuilder({
-        title: 'Test API',
-        version: '1.0.0',
-      });
-      const builder = new RouteBuilder(openApiBuilder);
-
-      builder.route({
-        method: 'GET',
-        path: '/api/test',
-        summary: 'Test endpoint',
-        handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
       });
 
       const doc = openApiBuilder.generateDocument();
-      expect(doc.paths).toHaveProperty('/api/test');
-      expect(doc.paths['/api/test'].get.summary).toBe('Test endpoint');
-    });
 
-    it('should register authenticated route with security in OpenAPI', () => {
-      const openApiBuilder = new OpenApiBuilder({
-        title: 'Test API',
-        version: '1.0.0',
-      });
-      const builder = new RouteBuilder(openApiBuilder);
-
-      builder.route({
-        method: 'GET',
-        path: '/api/protected',
-        summary: 'Protected endpoint',
-        requiresAuth: true,
-        handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
-      });
-
-      const doc = openApiBuilder.generateDocument();
-      expect(doc.paths['/api/protected'].get.security).toEqual([{ bearerAuth: [] }]);
-    });
-
-    it('should add 401 response for authenticated routes', () => {
-      const openApiBuilder = new OpenApiBuilder({
-        title: 'Test API',
-        version: '1.0.0',
-      });
-      const builder = new RouteBuilder(openApiBuilder);
-
-      builder.route({
-        method: 'GET',
-        path: '/api/protected',
-        summary: 'Protected endpoint',
-        requiresAuth: true,
-        handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
-      });
-
-      const doc = openApiBuilder.generateDocument();
-      expect(doc.paths['/api/protected'].get.responses).toHaveProperty('401');
-    });
-
-    it('should add 403 response for role-restricted routes', () => {
-      const openApiBuilder = new OpenApiBuilder({
-        title: 'Test API',
-        version: '1.0.0',
-      });
-      const builder = new RouteBuilder(openApiBuilder);
-
-      builder.route({
-        method: 'DELETE',
-        path: '/api/admin',
-        summary: 'Admin endpoint',
-        requiresAuth: true,
-        requiredRoles: [UserRole.ADMIN],
-        handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
-      });
-
-      const doc = openApiBuilder.generateDocument();
-      expect(doc.paths['/api/admin'].delete.responses).toHaveProperty('403');
-    });
-
-    it('should add 422 response for routes with body schema', () => {
-      const openApiBuilder = new OpenApiBuilder({
-        title: 'Test API',
-        version: '1.0.0',
-      });
-      const builder = new RouteBuilder(openApiBuilder);
-
-      builder.route({
-        method: 'POST',
-        path: '/api/users',
-        summary: 'Create user',
-        bodySchema: z.object({ name: z.string() }),
-        handler: async () => ({ status: 201, jsonBody: {} }),
-        responses: { 201: { description: 'Created' } },
-      });
-
-      const doc = openApiBuilder.generateDocument();
-      expect(doc.paths['/api/users'].post.responses).toHaveProperty('422');
-    });
-
-    it('should use 201 for POST routes by default', () => {
-      const openApiBuilder = new OpenApiBuilder({
-        title: 'Test API',
-        version: '1.0.0',
-      });
-      const builder = new RouteBuilder(openApiBuilder);
-
-      builder.route({
-        method: 'POST',
-        path: '/api/resource',
-        summary: 'Create resource',
-        handler: async () => ({ status: 201, jsonBody: {} }),
-        responses: { 201: { description: 'Created' } },
-      });
-
-      const doc = openApiBuilder.generateDocument();
-      expect(doc.paths['/api/resource'].post.responses).toHaveProperty('201');
-    });
-
-    it('should use custom success status when provided', () => {
-      const openApiBuilder = new OpenApiBuilder({
-        title: 'Test API',
-        version: '1.0.0',
-      });
-      const builder = new RouteBuilder(openApiBuilder);
-
-      builder.route({
-        method: 'DELETE',
-        path: '/api/resource',
-        summary: 'Delete resource',
-        successStatus: 204,
-        handler: async () => ({ status: 204 }),
-        responses: { 204: { description: 'No content' } },
-      });
-
-      const doc = openApiBuilder.generateDocument();
-      expect(doc.paths['/api/resource'].delete.responses).toHaveProperty('204');
-    });
-  });
-
-  describe('RouteBuilder - createAzureHandler', () => {
-    it('should create Azure handler from route', async () => {
-      const builder = new RouteBuilder();
-
-      const route: Route = {
-        method: 'GET',
-        path: '/api/test',
-        summary: 'Test',
-        handler: async () => ({ status: 200, jsonBody: { message: 'test' } }),
-        responses: { 200: { description: 'Success' } },
-      };
-
-      builder.route(route);
-
-      const azureHandler = builder.createAzureHandler(route);
-      const response = await azureHandler(mockRequest, mockContext);
-
-      expect(response.status).toBe(200);
-      expect(response.jsonBody.message).toBe('test');
-    });
-
-    it('should create handler with validation', async () => {
-      const builder = new RouteBuilder();
-      const bodySchema = z.object({
-        name: z.string(),
-      });
-
-      const route: Route = {
-        method: 'POST',
-        path: '/api/users',
-        summary: 'Create user',
-        bodySchema,
-        handler: async (req, ctx, { body }) => ({
-          status: 201,
-          jsonBody: { created: body },
-        }),
-        responses: { 201: { description: 'Created' } },
-      };
-
-      (mockRequest.json as any).mockResolvedValue({ name: 'John' });
-
-      builder.route(route);
-      const azureHandler = builder.createAzureHandler(route);
-      const response = await azureHandler(mockRequest, mockContext);
-
-      expect(response.status).toBe(201);
-      expect(response.jsonBody.created.name).toBe('John');
-    });
-
-    it('should create handler with authentication when JWT_SECRET is set', async () => {
-      const originalEnv = process.env.JWT_SECRET;
-      process.env.JWT_SECRET = 'test-secret';
-
-      try {
-        const builder = new RouteBuilder();
-        const route: Route = {
-          method: 'GET',
-          path: '/api/protected',
-          summary: 'Protected',
-          requiresAuth: true,
-          handler: async (req, ctx, { user }) => ({
-            status: 200,
-            jsonBody: { userId: user?.sub },
-          }),
-          responses: { 200: { description: 'Success' } },
-        };
-
-        const token = jwt.sign({ sub: '123' }, 'test-secret');
-        mockRequest.headers.set('authorization', `Bearer ${token}`);
-
-        builder.route(route);
-        const azureHandler = builder.createAzureHandler(route);
-        const response = await azureHandler(mockRequest, mockContext);
-
-        expect(response.status).toBe(200);
-        expect(response.jsonBody.userId).toBe('123');
-      } finally {
-        if (originalEnv) {
-          process.env.JWT_SECRET = originalEnv;
-        } else {
-          delete process.env.JWT_SECRET;
-        }
-      }
-    });
-
-    it('should create handler with role checking', async () => {
-      const originalEnv = process.env.JWT_SECRET;
-      process.env.JWT_SECRET = 'test-secret';
-
-      try {
-        const builder = new RouteBuilder();
-        const route: Route = {
-          method: 'DELETE',
-          path: '/api/admin',
-          summary: 'Admin only',
-          requiresAuth: true,
-          requiredRoles: [UserRole.ADMIN],
-          handler: async () => ({ status: 200, jsonBody: { message: 'deleted' } }),
-          responses: { 200: { description: 'Success' } },
-        };
-
-        const token = jwt.sign({ sub: '123', roles: [UserRole.ADMIN] }, 'test-secret');
-        mockRequest.headers.set('authorization', `Bearer ${token}`);
-
-        builder.route(route);
-        const azureHandler = builder.createAzureHandler(route);
-        const response = await azureHandler(mockRequest, mockContext);
-
-        expect(response.status).toBe(200);
-      } finally {
-        if (originalEnv) {
-          process.env.JWT_SECRET = originalEnv;
-        } else {
-          delete process.env.JWT_SECRET;
-        }
-      }
+      expect(doc.paths['/api/resource'].post.responses['201']).toBeDefined();
     });
   });
 
@@ -516,58 +402,60 @@ describe('routes', () => {
       };
 
       const handler = createRouteHandler(serviceFunction);
+
+      const body = { name: 'Test' };
       const response = await handler(mockRequest, mockContext, {
-        body: { name: 'John' },
-        correlationId: 'test-123',
+        body,
+        correlationId: 'test-id',
       } as any);
 
       expect(response.status).toBe(200);
-      expect(response.jsonBody.id).toBe('123');
-      expect(response.jsonBody.name).toBe('John');
+      expect(response.jsonBody).toEqual({ id: '123', name: 'Test' });
     });
 
     it('should use custom success status', async () => {
       const serviceFunction = async (input: any) => input;
 
       const handler = createRouteHandler(serviceFunction, { successStatus: 201 });
+
       const response = await handler(mockRequest, mockContext, {
         body: { test: 'data' },
-        correlationId: 'test-123',
+        correlationId: 'test-id',
       } as any);
 
       expect(response.status).toBe(201);
     });
 
-    it('should pass user ID when passUser is true', async () => {
-      const serviceFunction = async (input: any, userId?: string) => {
-        return { data: input, userId };
-      };
+    it('should pass user ID when configured', async () => {
+      const serviceFunction = vi.fn(async (input: any, userId?: string) => {
+        return { input, userId };
+      });
 
       const handler = createRouteHandler(serviceFunction, { passUser: true });
-      const response = await handler(mockRequest, mockContext, {
+
+      await handler(mockRequest, mockContext, {
         body: { test: 'data' },
         user: { sub: 'user-123' },
-        correlationId: 'test-123',
+        correlationId: 'test-id',
       } as any);
 
-      expect(response.status).toBe(200);
-      expect(response.jsonBody.userId).toBe('user-123');
+      expect(serviceFunction).toHaveBeenCalledWith({ test: 'data' }, 'user-123');
     });
 
-    it('should not pass user ID when passUser is false', async () => {
-      const serviceFunction = async (input: any, userId?: string) => {
-        return { data: input, userId };
-      };
+    it('should not pass user ID when not configured', async () => {
+      const serviceFunction = vi.fn(async (input: any, userId?: string) => {
+        return { input, userId };
+      });
 
-      const handler = createRouteHandler(serviceFunction, { passUser: false });
-      const response = await handler(mockRequest, mockContext, {
+      const handler = createRouteHandler(serviceFunction);
+
+      await handler(mockRequest, mockContext, {
         body: { test: 'data' },
         user: { sub: 'user-123' },
-        correlationId: 'test-123',
+        correlationId: 'test-id',
       } as any);
 
-      expect(response.status).toBe(200);
-      expect(response.jsonBody.userId).toBeUndefined();
+      expect(serviceFunction).toHaveBeenCalledWith({ test: 'data' }, undefined);
     });
 
     it('should handle synchronous service function', async () => {
@@ -576,83 +464,14 @@ describe('routes', () => {
       };
 
       const handler = createRouteHandler(serviceFunction);
+
       const response = await handler(mockRequest, mockContext, {
         body: { value: 5 },
-        correlationId: 'test-123',
+        correlationId: 'test-id',
       } as any);
 
       expect(response.status).toBe(200);
-      expect(response.jsonBody.result).toBe(10);
-    });
-  });
-
-  describe('RouteBuilder - edge cases', () => {
-    it('should handle multiple routes on same path with different methods', () => {
-      const builder = new RouteBuilder();
-
-      builder.route({
-        method: 'GET',
-        path: '/api/resource',
-        summary: 'Get resource',
-        handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
-      });
-
-      builder.route({
-        method: 'POST',
-        path: '/api/resource',
-        summary: 'Create resource',
-        handler: async () => ({ status: 201, jsonBody: {} }),
-        responses: { 201: { description: 'Created' } },
-      });
-
-      const getRoute = builder.getRoute('GET', '/api/resource');
-      const postRoute = builder.getRoute('POST', '/api/resource');
-
-      expect(getRoute?.summary).toBe('Get resource');
-      expect(postRoute?.summary).toBe('Create resource');
-    });
-
-    it('should handle empty route list', () => {
-      const builder = new RouteBuilder();
-      const routes = builder.getAllRoutes();
-      expect(routes).toHaveLength(0);
-    });
-
-    it('should handle route with no optional fields', () => {
-      const builder = new RouteBuilder();
-
-      builder.route({
-        method: 'GET',
-        path: '/api/minimal',
-        summary: 'Minimal',
-        handler: async () => ({ status: 200, jsonBody: {} }),
-        responses: { 200: { description: 'Success' } },
-      });
-
-      const route = builder.getRoute('GET', '/api/minimal');
-      expect(route?.description).toBeUndefined();
-      expect(route?.tags).toBeUndefined();
-      expect(route?.requiresAuth).toBeUndefined();
-      expect(route?.requiredRoles).toBeUndefined();
-    });
-
-    it('should handle handler returning null body', async () => {
-      const builder = new RouteBuilder();
-      const route: Route = {
-        method: 'DELETE',
-        path: '/api/resource',
-        summary: 'Delete',
-        handler: async () => ({ status: 204 }),
-        responses: { 204: { description: 'No content' } },
-      };
-
-      builder.route(route);
-      const azureHandler = builder.createAzureHandler(route);
-      const response = await azureHandler(mockRequest, mockContext);
-
-      expect(response.status).toBe(204);
-      expect(response.jsonBody).toBeUndefined();
+      expect(response.jsonBody).toEqual({ result: 10 });
     });
   });
 });

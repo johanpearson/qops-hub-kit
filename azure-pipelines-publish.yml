@@ -1,99 +1,86 @@
 name: Publish Package
 
-# Trigger on version tags (v*.*.*) only from main or hotfix branches
-trigger:
-  tags:
-    include:
-      - v*.*.*
-  branches:
-    include:
-      - main
-      - hotfix/*
-
-# No manual trigger
+trigger: none
 pr: none
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: ubuntu-latest
 
 variables:
-  nodeVersion: '18.x'
-  # IMPORTANT: Update this to match your Azure Artifacts feed name
-  artifactFeedName: 'qops-feed'
+  nodeVersion: '22.x'
 
 jobs:
   - job: PublishPackage
-    displayName: 'Build and Publish'
+    displayName: Build and publish
     steps:
-      # Setup Node.js
+      - checkout: self
+
       - task: NodeTool@0
-        displayName: 'Setup Node.js $(nodeVersion)'
+        displayName: Use Node.js $(nodeVersion)
         inputs:
-          versionSpec: '$(nodeVersion)'
+          versionSpec: $(nodeVersion)
 
-      # Install dependencies
-      - task: Npm@1
-        displayName: 'Install dependencies'
+      - task: NpmAuthenticate@0
+        displayName: Authenticate npm to Azure Artifacts
         inputs:
-          command: 'ci'
+          workingFile: .npmrc
 
-      # Extract version from git tag and validate branch
-      - bash: |
-          TAG_VERSION=$(git describe --tags --exact-match)
-          PACKAGE_VERSION=${TAG_VERSION#v}
-          
-          # Get branch name from Azure Pipelines variable
-          BRANCH_NAME="$(Build.SourceBranch)"
-          BRANCH_NAME=${BRANCH_NAME#refs/heads/}
-          
-          echo "Git tag: $TAG_VERSION"
-          echo "Package version: $PACKAGE_VERSION"
-          echo "Branch: $BRANCH_NAME"
-          
-          # Validate branch is main or hotfix
-          if [[ "$BRANCH_NAME" != "main" && ! "$BRANCH_NAME" =~ ^hotfix/ ]]; then
-            echo "##vso[task.logissue type=error]Publishing is only allowed from 'main' or 'hotfix/*' branches. Current branch: $BRANCH_NAME"
+      - script: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Package: $PKG_NAME"
+          echo "Version: $PKG_VERSION"
+
+          echo "##vso[task.setvariable variable=PackageName]$PKG_NAME"
+          echo "##vso[task.setvariable variable=PackageVersion]$PKG_VERSION"
+        displayName: Read package metadata
+
+      - script: |
+          echo "Checking if $(PackageName)@$(PackageVersion) already exists..."
+          EXISTING=$(npm view "$(PackageName)@$(PackageVersion)" version 2>/dev/null || true)
+
+          if [ -n "$EXISTING" ]; then
+            echo "$(PackageName)@$(PackageVersion) is already published."
             exit 1
           fi
-          
-          echo "##vso[task.setvariable variable=PackageVersion]$PACKAGE_VERSION"
-        displayName: 'Extract Version and Validate Branch'
 
-      # Update package.json version to match the tag
+          echo "Not published yet — continuing."
+        displayName: Fail if version already published
+
+      - script: npm ci
+        displayName: Install dependencies
+
+      - script: npm run typecheck
+        displayName: Typecheck
+
+      - script: npm run build
+        displayName: Build
+
+      - script: npm run test:coverage
+        displayName: Test (coverage)
+
+      - task: PublishTestResults@2
+        displayName: Publish test results
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: '**/junit.xml'
+          failTaskOnFailedTests: true
+          testRunTitle: Unit Tests
+
+      - task: PublishCodeCoverageResults@2
+        displayName: Publish code coverage
+        condition: succeededOrFailed()
+        inputs:
+          codeCoverageTool: Cobertura
+          summaryFileLocation: '$(Build.SourcesDirectory)/coverage/cobertura-coverage.xml'
+          reportDirectory: '$(Build.SourcesDirectory)/coverage'
+          failIfCoverageEmpty: true
+
+      - script: npm publish
+        displayName: Publish to Azure Artifacts
+
       - bash: |
-          npm version $(PackageVersion) --no-git-tag-version --allow-same-version
-        displayName: 'Update package.json Version'
-
-      # Run quality checks
-      - task: Npm@1
-        displayName: 'Run Type Checking'
-        inputs:
-          command: 'custom'
-          customCommand: 'run typecheck'
-
-      - task: Npm@1
-        displayName: 'Build Package'
-        inputs:
-          command: 'custom'
-          customCommand: 'run build'
-
-      - task: Npm@1
-        displayName: 'Run Tests'
-        inputs:
-          command: 'custom'
-          customCommand: 'test'
-
-      # Publish to Azure Artifacts
-      - task: Npm@1
-        displayName: 'Publish to Azure Artifacts'
-        inputs:
-          command: 'publish'
-          publishRegistry: 'useFeed'
-          publishFeed: '$(artifactFeedName)'
-
-      # Success message
-      - bash: |
-          echo "✅ Successfully published version $(PackageVersion) to Azure Artifacts feed: $(artifactFeedName)"
-          echo "📦 Package: @qops/hub-kit@$(PackageVersion)"
-          echo "🏷️  Git tag: v$(PackageVersion)"
-        displayName: 'Publish Summary'
+          echo "✅ Published $(PackageName)@$(PackageVersion)"
+        displayName: Publish summary

@@ -1,71 +1,138 @@
-import { describe, it, expect } from 'vitest';
-import { AppError, ErrorCode, ERROR_STATUS_MAP, createValidationError, createUnauthorizedError } from '../src/errors';
+import { describe, expect, it } from 'vitest';
+import {
+  AppError,
+  ERROR_STATUS_MAP,
+  ErrorCode,
+  createForbiddenError,
+  createNotFoundError,
+  createUnauthorizedError,
+  createValidationError,
+} from '../src/errors';
 
 describe('errors', () => {
   describe('AppError', () => {
-    it('should create an error with code and message', () => {
-      const error = new AppError(ErrorCode.NOT_FOUND, 'Resource not found');
-      expect(error.code).toBe(ErrorCode.NOT_FOUND);
-      expect(error.message).toBe('Resource not found');
-      expect(error.statusCode).toBe(404);
+    it('should create error with code and message', () => {
+      const error = new AppError(ErrorCode.BAD_REQUEST, 'Invalid input');
+
+      expect(error.code).toBe(ErrorCode.BAD_REQUEST);
+      expect(error.message).toBe('Invalid input');
+      expect(error.name).toBe('AppError');
+      expect(error.details).toBeUndefined();
     });
 
-    it('should include details if provided', () => {
+    it('should create error with details', () => {
       const details = { field: 'email', reason: 'invalid format' };
       const error = new AppError(ErrorCode.VALIDATION_ERROR, 'Validation failed', details);
+
       expect(error.details).toEqual(details);
     });
 
-    it('should convert to JSON format', () => {
-      const error = new AppError(ErrorCode.BAD_REQUEST, 'Bad request');
+    it('should map error codes to HTTP status codes', () => {
+      const testCases = [
+        { code: ErrorCode.BAD_REQUEST, expectedStatus: 400 },
+        { code: ErrorCode.UNAUTHORIZED, expectedStatus: 401 },
+        { code: ErrorCode.FORBIDDEN, expectedStatus: 403 },
+        { code: ErrorCode.NOT_FOUND, expectedStatus: 404 },
+        { code: ErrorCode.CONFLICT, expectedStatus: 409 },
+        { code: ErrorCode.VALIDATION_ERROR, expectedStatus: 422 },
+        { code: ErrorCode.INTERNAL_ERROR, expectedStatus: 500 },
+      ];
+
+      testCases.forEach(({ code, expectedStatus }) => {
+        const error = new AppError(code, 'Test message');
+        expect(error.statusCode).toBe(expectedStatus);
+      });
+    });
+
+    it('should serialize to JSON without details', () => {
+      const error = new AppError(ErrorCode.NOT_FOUND, 'Resource not found');
       const json = error.toJSON();
+
       expect(json).toEqual({
         error: {
-          code: ErrorCode.BAD_REQUEST,
-          message: 'Bad request',
+          code: ErrorCode.NOT_FOUND,
+          message: 'Resource not found',
         },
       });
     });
 
-    it('should include details in JSON if present', () => {
-      const details = { foo: 'bar' };
-      const error = new AppError(ErrorCode.INTERNAL_ERROR, 'Error', details);
+    it('should serialize to JSON with details', () => {
+      const details = { resourceId: '123' };
+      const error = new AppError(ErrorCode.NOT_FOUND, 'Resource not found', details);
       const json = error.toJSON();
-      expect(json.error.details).toEqual(details);
+
+      expect(json).toEqual({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Resource not found',
+          details,
+        },
+      });
     });
   });
 
-  describe('ERROR_STATUS_MAP', () => {
-    it('should map error codes to correct HTTP status codes', () => {
-      expect(ERROR_STATUS_MAP[ErrorCode.BAD_REQUEST]).toBe(400);
-      expect(ERROR_STATUS_MAP[ErrorCode.UNAUTHORIZED]).toBe(401);
-      expect(ERROR_STATUS_MAP[ErrorCode.FORBIDDEN]).toBe(403);
-      expect(ERROR_STATUS_MAP[ErrorCode.NOT_FOUND]).toBe(404);
-      expect(ERROR_STATUS_MAP[ErrorCode.CONFLICT]).toBe(409);
-      expect(ERROR_STATUS_MAP[ErrorCode.VALIDATION_ERROR]).toBe(422);
-      expect(ERROR_STATUS_MAP[ErrorCode.INTERNAL_ERROR]).toBe(500);
-    });
-  });
+  describe('error factory functions', () => {
+    it('should create validation error', () => {
+      const error = createValidationError('Invalid data', { field: 'name' });
 
-  describe('helper functions', () => {
-    it('createValidationError should create validation error', () => {
-      const error = createValidationError('Invalid input', { field: 'email' });
       expect(error.code).toBe(ErrorCode.VALIDATION_ERROR);
-      expect(error.message).toBe('Invalid input');
+      expect(error.message).toBe('Invalid data');
+      expect(error.details).toEqual({ field: 'name' });
       expect(error.statusCode).toBe(422);
-      expect(error.details).toEqual({ field: 'email' });
     });
 
-    it('createUnauthorizedError should create unauthorized error', () => {
+    it('should create unauthorized error with default message', () => {
       const error = createUnauthorizedError();
+
       expect(error.code).toBe(ErrorCode.UNAUTHORIZED);
       expect(error.message).toBe('Unauthorized');
       expect(error.statusCode).toBe(401);
     });
 
-    it('createUnauthorizedError should accept custom message', () => {
-      const error = createUnauthorizedError('Token expired');
-      expect(error.message).toBe('Token expired');
+    it('should create unauthorized error with custom message', () => {
+      const error = createUnauthorizedError('Invalid token');
+
+      expect(error.message).toBe('Invalid token');
+    });
+
+    it('should create forbidden error with default message', () => {
+      const error = createForbiddenError();
+
+      expect(error.code).toBe(ErrorCode.FORBIDDEN);
+      expect(error.message).toBe('Forbidden');
+      expect(error.statusCode).toBe(403);
+    });
+
+    it('should create forbidden error with custom message', () => {
+      const error = createForbiddenError('Insufficient permissions');
+
+      expect(error.message).toBe('Insufficient permissions');
+    });
+
+    it('should create not found error with default message', () => {
+      const error = createNotFoundError();
+
+      expect(error.code).toBe(ErrorCode.NOT_FOUND);
+      expect(error.message).toBe('Resource not found');
+      expect(error.statusCode).toBe(404);
+    });
+
+    it('should create not found error with custom message', () => {
+      const error = createNotFoundError('User not found');
+
+      expect(error.message).toBe('User not found');
+    });
+  });
+
+  describe('ERROR_STATUS_MAP', () => {
+    it('should contain all error codes', () => {
+      const errorCodes = Object.values(ErrorCode);
+      const mappedCodes = Object.keys(ERROR_STATUS_MAP);
+
+      expect(mappedCodes).toHaveLength(errorCodes.length);
+      errorCodes.forEach((code) => {
+        expect(ERROR_STATUS_MAP[code as ErrorCode]).toBeDefined();
+      });
     });
   });
 });

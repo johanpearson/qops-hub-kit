@@ -15,7 +15,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  nodeVersion: '18.x'
+  nodeVersion: '22.x'
 
 stages:
   - stage: Build
@@ -29,32 +29,22 @@ stages:
             inputs:
               versionSpec: '$(nodeVersion)'
 
-          - task: Npm@1
+          - task: npmAuthenticate@0
+            displayName: 'Authenticate with Azure Artifacts'
+            inputs:
+              workingFile: .npmrc
+
+          - script: npm ci
             displayName: 'Install dependencies'
-            inputs:
-              command: 'ci'
-              workingDir: '$(Build.SourcesDirectory)'
 
-          - task: Npm@1
+          - script: npm run typecheck
             displayName: 'Run type checking'
-            inputs:
-              command: 'custom'
-              customCommand: 'run typecheck'
-              workingDir: '$(Build.SourcesDirectory)'
 
-          - task: Npm@1
+          - script: npm run build
             displayName: 'Build TypeScript'
-            inputs:
-              command: 'custom'
-              customCommand: 'run build'
-              workingDir: '$(Build.SourcesDirectory)'
 
-          - task: Npm@1
+          - script: npm run test:coverage
             displayName: 'Run tests with coverage'
-            inputs:
-              command: 'custom'
-              customCommand: 'run test:coverage'
-              workingDir: '$(Build.SourcesDirectory)'
 
           - task: PublishTestResults@2
             displayName: 'Publish test results'
@@ -72,11 +62,3 @@ stages:
               codeCoverageTool: 'Cobertura'
               summaryFileLocation: '$(Build.SourcesDirectory)/coverage/cobertura-coverage.xml'
               reportDirectory: '$(Build.SourcesDirectory)/coverage'
-
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish build artifacts'
-            condition: succeeded()
-            inputs:
-              pathToPublish: '$(Build.SourcesDirectory)/dist'
-              artifactName: 'dist'
-              publishLocation: 'Container'

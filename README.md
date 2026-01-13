@@ -156,14 +156,6 @@ curl -X POST http://localhost:7071/api/users \
 
 ---
 
-## Complete Setup Guide
-
-For a complete step-by-step guide including project structure, configuration files, service layer patterns, and all function handlers, see:
-
-👉 **[Getting Started Guide](./docs/GETTING-STARTED.md)**
-
----
-
 ## Core Features
 
 ### 1. Health Check (No Configuration Needed)
@@ -274,55 +266,37 @@ const handler = createHandler(
 
 ---
 
+## Release & Publishing
+
+This package is published as a **private npm package to Azure Artifacts** via an automated Azure DevOps pipeline.
+
+### How to release
+
+1. Create a branch and **bump the version in `package.json`** (SemVer)
+
+   ```bash
+   npm version patch | minor | major
+   ```
+
+2. Open a **PR to `main`** (the `main` branch is protected)
+3. Merge the PR after checks pass
+4. Run the **Publish** pipeline
+
+The pipeline:
+
+- Fails fast if the version already exists
+- Builds, tests, and validates the package
+- Publishes to Azure Artifacts
+
+> **Note:** Versions are immutable. Always bump the version before publishing.
+
+---
+
 ## Documentation
 
 ### 📚 Detailed Guides
 
-- **[Getting Started](./docs/GETTING-STARTED.md)** - Complete setup guide with all configuration files
-- **[Advanced Usage](./docs/ADVANCED.md)** - Complex validation, RBAC, testing, and best practices
 - **[Azure Integrations](./docs/INTEGRATIONS.md)** - Cosmos DB, Blob Storage, Service Bus, Key Vault, and more
-
-### 📖 API Reference
-
-#### Handler Options
-
-```typescript
-interface HandlerOptions {
-  bodySchema?: ZodSchema; // Validate request body
-  querySchema?: ZodSchema; // Validate query parameters
-  jwtConfig?: {
-    secret: string; // JWT secret key
-    algorithms?: string[]; // Default: ['HS256']
-  };
-  requiredRoles?: UserRole[]; // Require specific roles
-  enableLogging?: boolean; // Log requests/responses
-}
-```
-
-#### Handler Context
-
-```typescript
-async (request, context, enrichedContext) => {
-  const {
-    body, // Validated body (if bodySchema provided)
-    query, // Validated query params (if querySchema provided)
-    user, // JWT payload (if jwtConfig provided)
-    correlationId, // Unique request ID
-  } = enrichedContext;
-};
-```
-
-#### Error Codes
-
-- `BAD_REQUEST` (400)
-- `UNAUTHORIZED` (401)
-- `FORBIDDEN` (403)
-- `NOT_FOUND` (404)
-- `CONFLICT` (409)
-- `VALIDATION_ERROR` (422)
-- `INTERNAL_ERROR` (500)
-
----
 
 ## Best Practices
 
@@ -357,8 +331,6 @@ npm run lint
 npm run format
 ```
 
----
-
 ## Environment Variables
 
 Required for JWT authentication:
@@ -369,28 +341,3 @@ FUNCTIONS_WORKER_RUNTIME=node
 ```
 
 For Azure service integrations, see [Azure Integrations Guide](./docs/INTEGRATIONS.md).
-
----
-
-## Contributing
-
-Contributions are welcome! Please ensure:
-
-- All tests pass (`npm test`)
-- Code coverage ≥ 80% (`npm run test:coverage`)
-- Code is formatted (`npm run format`)
-- No linting errors (`npm run lint`)
-
----
-
-## License
-
-MIT
-
----
-
-## Links
-
-- **Repository**: [github.com/johanpearson/qops-hub-kit](https://github.com/johanpearson/qops-hub-kit)
-- **Issues**: [Report bugs or request features](https://github.com/johanpearson/qops-hub-kit/issues)
-- **Author**: Johan Pearson

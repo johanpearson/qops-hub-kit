@@ -1,13 +1,13 @@
 import { HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import { AppError, ErrorCode } from './errors.js';
+import { extractBearerToken, JwtConfig, JwtPayload, setAuthUser, UserRole, verifyRole, verifyToken } from './auth.js';
 import {
-  getOrCreateCorrelationId,
   addCorrelationIdToContext,
-  getCorrelationId,
   CORRELATION_ID_HEADER,
+  getCorrelationId,
+  getOrCreateCorrelationId,
 } from './correlation.js';
-import { extractBearerToken, verifyToken, verifyRole, setAuthUser, JwtConfig, UserRole, JwtPayload } from './auth.js';
+import { AppError, ErrorCode } from './errors.js';
 
 /**
  * Handler function type
@@ -109,7 +109,7 @@ function handleError(error: unknown, context: InvocationContext): HttpResponseIn
         error: {
           code: ErrorCode.VALIDATION_ERROR,
           message: 'Validation failed',
-          details: error.errors,
+          details: error.issues,
         },
       },
     });
@@ -205,6 +205,7 @@ export function createHandler(
         let body;
         try {
           body = await request.json();
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (_error) {
           throw new AppError(ErrorCode.BAD_REQUEST, 'Invalid JSON in request body');
         }

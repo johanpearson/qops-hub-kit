@@ -5,7 +5,7 @@ import prettierPlugin from 'eslint-plugin-prettier';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '*.js'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js'],
   },
 
   // TypeScript recommended rules

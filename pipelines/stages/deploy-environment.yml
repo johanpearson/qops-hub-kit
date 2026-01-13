@@ -92,5 +92,7 @@ stages:
           vmImage: ${{ parameters.vmImage }}
           workingDirectory: ${{ parameters.workingDirectory }}
           jobName: 'DeployApp'
-          dependsOn: ${{ if eq(parameters.deployInfrastructure, true) }}
+          dependsOn: ${{ if eq(parameters.deployInfrastructure, true) }}:
             - DeployInfrastructure
+          ${{ else }}:
+            []

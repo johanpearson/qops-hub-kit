@@ -113,10 +113,6 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
             value: '~22'
           }
           {
-            name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
-            value: reference(resourceId('Microsoft.Insights/components', '${functionAppName}-insights'), '2020-02-02').InstrumentationKey
-          }
-          {
             name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
             value: appInsightsConnectionString
           }

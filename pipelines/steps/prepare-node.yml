@@ -1,5 +1,10 @@
 # Prepare Node.js Step Template
 # Installs Node.js, authenticates with npm, and installs dependencies
+#
+# Note: Some steps are duplicated with different conditions to handle optional workingDirectory.
+# This is necessary due to Azure Pipelines YAML limitations where empty strings in workingDirectory
+# cause the task to fail. The alternative of using conditional expressions doesn't work well with
+# all task types.
 
 parameters:
   - name: nodeVersion

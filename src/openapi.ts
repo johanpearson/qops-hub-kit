@@ -133,7 +133,7 @@ export class OpenApiBuilder {
 
       // Add file upload fields to the schema
       if (route.fileUploads) {
-        const fileFields: any = {};
+        const fileFields: Record<string, z.ZodTypeAny> = {};
         for (const [fieldName, fileConfig] of Object.entries(route.fileUploads)) {
           // File uploads are represented as strings with binary format in OpenAPI
           const baseFileSchema = z.string().openapi({

@@ -267,6 +267,8 @@ export function createHandler(
         for (const [key, value] of formData.entries()) {
           if (value instanceof File) {
             // Handle file upload
+            // Note: This loads the entire file into memory. For large files (>100MB),
+            // consider implementing streaming or adding file size validation
             const arrayBuffer = await value.arrayBuffer();
             files.push({
               fieldName: key,

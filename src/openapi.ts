@@ -128,59 +128,32 @@ export class OpenApiBuilder {
 
     // Handle multipart/form-data for file uploads
     if (route.formDataSchema || route.fileUploads) {
-      const properties: any = {};
-      const required: string[] = [];
+      // Build schema combining form data fields and file uploads
+      let combinedSchema = route.formDataSchema || z.object({});
 
-      // Add regular form fields from schema
-      if (route.formDataSchema) {
-        // Use the schema directly for OpenAPI generation
-        // The zod-to-openapi library will handle the conversion
-        const schemaShape = (route.formDataSchema as any)._def?.shape;
-        if (schemaShape) {
-          if (typeof schemaShape === 'function') {
-            const shape = schemaShape();
-            for (const [key, zodType] of Object.entries(shape)) {
-              properties[key] = zodType;
-              const isOptional = (zodType as any)._def?.typeName === 'ZodOptional';
-              if (!isOptional) {
-                required.push(key);
-              }
-            }
-          } else {
-            // Handle direct shape object
-            for (const [key, zodType] of Object.entries(schemaShape)) {
-              properties[key] = zodType;
-              const isOptional = (zodType as any)._def?.typeName === 'ZodOptional';
-              if (!isOptional) {
-                required.push(key);
-              }
-            }
-          }
-        }
-      }
-
-      // Add file upload fields
+      // Add file upload fields to the schema
       if (route.fileUploads) {
+        const fileFields: any = {};
         for (const [fieldName, fileConfig] of Object.entries(route.fileUploads)) {
-          properties[fieldName] = {
+          // File uploads are represented as strings with binary format in OpenAPI
+          const baseFileSchema = z.string().openapi({
             type: 'string',
             format: 'binary',
             description: fileConfig.description,
-          };
-          if (fileConfig.required) {
-            required.push(fieldName);
-          }
+          });
+
+          fileFields[fieldName] = fileConfig.required ? baseFileSchema : baseFileSchema.optional();
         }
+
+        // Merge file fields with form data fields
+        const fileFieldsSchema = z.object(fileFields);
+        combinedSchema = combinedSchema.merge(fileFieldsSchema);
       }
 
       requestBody = {
         content: {
           'multipart/form-data': {
-            schema: {
-              type: 'object',
-              properties,
-              ...(required.length > 0 && { required }),
-            },
+            schema: combinedSchema,
           },
         },
       };

@@ -1,0 +1,70 @@
+# Simple Service Pipeline Example
+# Minimal example using only step templates
+# Perfect for getting started quickly
+
+name: CI/CD
+
+trigger:
+  - main
+
+pr:
+  - '*'
+
+variables:
+  nodeVersion: '22.x'
+  serviceName: 'myservice'
+
+# Reference the hub-kit repo for templates
+resources:
+  repositories:
+    - repository: hubkit
+      type: git
+      name: qops-hub-kit
+      ref: refs/heads/main
+
+stages:
+  - stage: Build
+    jobs:
+      - job: Build
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          # Install Node.js and dependencies
+          - template: pipelines/steps/prepare-node.yml@hubkit
+            parameters:
+              nodeVersion: $(nodeVersion)
+
+          # Build the code
+          - template: pipelines/steps/build.yml@hubkit
+
+          # Run tests
+          - template: pipelines/steps/unit-test.yml@hubkit
+
+          # Package for deployment
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: '$(Build.SourcesDirectory)'
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
+
+          - publish: '$(Build.ArtifactStagingDirectory)/app.zip'
+            artifact: package
+
+  - stage: Deploy
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployDev
+        environment: dev
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Deploy to Azure Function App
+                - template: pipelines/steps/deploy-function-app.yml@hubkit
+                  parameters:
+                    azureSubscription: 'Azure-Connection'
+                    functionAppName: 'func-myservice-dev'
+                    package: '$(Pipeline.Workspace)/package/app.zip'

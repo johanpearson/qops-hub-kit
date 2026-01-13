@@ -1,0 +1,23 @@
+# Build Step Template
+# Builds TypeScript code
+
+parameters:
+  - name: workingDirectory
+    type: string
+    default: ''
+    displayName: 'Working directory (optional)'
+  
+  - name: buildScript
+    type: string
+    default: 'npm run build'
+    displayName: 'Build script to run'
+
+steps:
+  - script: ${{ parameters.buildScript }}
+    displayName: 'Build TypeScript'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    condition: ne('${{ parameters.workingDirectory }}', '')
+
+  - script: ${{ parameters.buildScript }}
+    displayName: 'Build TypeScript'
+    condition: eq('${{ parameters.workingDirectory }}', '')

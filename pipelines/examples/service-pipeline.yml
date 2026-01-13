@@ -1,0 +1,156 @@
+# Single Service Pipeline Example
+# This example shows how to use the pipeline templates for a single service
+# Copy this to your service repository and customize as needed
+
+name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/*
+      - package.json
+
+pr:
+  branches:
+    include:
+      - '*'
+
+variables:
+  - name: nodeVersion
+    value: '22.x'
+  - name: serviceName
+    value: 'profile' # Change to your service name
+  - name: azureSubscription
+    value: 'Azure-Connection' # Your Azure DevOps service connection
+  
+  # Function App names (get these from your infrastructure deployment)
+  - name: functionAppNameDev
+    value: 'func-qops-profile-dev-xyz'
+  - name: functionAppNameTest
+    value: 'func-qops-profile-test-xyz'
+  - name: functionAppNameProd
+    value: 'func-qops-profile-prod-xyz'
+
+# Reference the qops-hub-kit repository for templates
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: qops-hub-kit # Your Azure DevOps project/repo name
+      ref: refs/heads/main
+
+stages:
+  # CI Stage - Build and Test
+  - stage: CI
+    displayName: 'Build and Test'
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build and Test'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          # Prepare Node.js
+          - template: pipelines/steps/prepare-node.yml@templates
+            parameters:
+              nodeVersion: $(nodeVersion)
+
+          # Type check
+          - script: npm run typecheck
+            displayName: 'Type check'
+
+          # Build
+          - template: pipelines/steps/build.yml@templates
+            parameters:
+              buildScript: 'npm run build'
+
+          # Unit tests
+          - template: pipelines/steps/unit-test.yml@templates
+            parameters:
+              testScript: 'npm run test:coverage'
+              publishResults: true
+              publishCoverage: true
+
+          # Package for deployment
+          - task: ArchiveFiles@2
+            displayName: 'Create deployment package'
+            inputs:
+              rootFolderOrFile: '$(Build.SourcesDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/$(serviceName).zip'
+              replaceExistingArchive: true
+
+          # Publish artifact
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish artifacts'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+
+  # Deploy to Dev
+  - stage: DeployDev
+    displayName: 'Deploy to DEV'
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployDev
+        displayName: 'Deploy to Dev Environment'
+        environment: 'dev'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: pipelines/steps/deploy-function-app.yml@templates
+                  parameters:
+                    azureSubscription: $(azureSubscription)
+                    functionAppName: $(functionAppNameDev)
+                    package: '$(Pipeline.Workspace)/drop/$(serviceName).zip'
+
+  # Deploy to Test (with approval)
+  - stage: DeployTest
+    displayName: 'Deploy to TEST'
+    dependsOn: DeployDev
+    condition: succeeded()
+    jobs:
+      - deployment: DeployTest
+        displayName: 'Deploy to Test Environment'
+        environment: 'test' # Configure approvals in Azure DevOps
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: pipelines/steps/deploy-function-app.yml@templates
+                  parameters:
+                    azureSubscription: $(azureSubscription)
+                    functionAppName: $(functionAppNameTest)
+                    package: '$(Pipeline.Workspace)/drop/$(serviceName).zip'
+
+  # Deploy to Prod (with approval)
+  - stage: DeployProd
+    displayName: 'Deploy to PROD'
+    dependsOn: DeployTest
+    condition: succeeded()
+    jobs:
+      - deployment: DeployProd
+        displayName: 'Deploy to Production Environment'
+        environment: 'prod' # Configure approvals in Azure DevOps
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: pipelines/steps/deploy-function-app.yml@templates
+                  parameters:
+                    azureSubscription: $(azureSubscription)
+                    functionAppName: $(functionAppNameProd)
+                    package: '$(Pipeline.Workspace)/drop/$(serviceName).zip'

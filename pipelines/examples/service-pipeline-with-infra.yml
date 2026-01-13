@@ -1,0 +1,184 @@
+# Service Pipeline with Infrastructure Deployment
+# This example shows how to deploy infrastructure AND code for a single service
+# Use this when you want to deploy/update infrastructure as part of your pipeline
+
+name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - '*'
+
+variables:
+  - name: nodeVersion
+    value: '22.x'
+  - name: serviceName
+    value: 'profile' # Your service name
+  - name: azureSubscription
+    value: 'Azure-Connection'
+  - name: location
+    value: 'swedencentral'
+  
+  # Variable groups for sensitive data (create in Azure DevOps Library)
+  - group: 'qops-secrets-dev'
+  - group: 'qops-secrets-test'
+  - group: 'qops-secrets-prod'
+
+# Reference the qops-hub-kit repository for templates
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: qops-hub-kit
+      ref: refs/heads/main
+
+stages:
+  # CI Stage
+  - stage: CI
+    displayName: 'Build and Test'
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build and Test'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          - template: pipelines/steps/prepare-node.yml@templates
+            parameters:
+              nodeVersion: $(nodeVersion)
+
+          - template: pipelines/steps/build.yml@templates
+
+          - template: pipelines/steps/unit-test.yml@templates
+
+          - task: ArchiveFiles@2
+            displayName: 'Package application'
+            inputs:
+              rootFolderOrFile: '$(Build.SourcesDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/$(serviceName).zip'
+
+          - publish: '$(Build.ArtifactStagingDirectory)'
+            artifact: 'drop'
+            displayName: 'Publish artifact'
+
+  # Deploy to Dev (with infrastructure)
+  - stage: DeployDev
+    displayName: 'Deploy to DEV'
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      # Deploy infrastructure
+      - job: DeployInfrastructureDev
+        displayName: 'Deploy DEV Infrastructure'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: templates
+            displayName: 'Checkout templates repo'
+
+          - task: AzureCLI@2
+            displayName: 'Deploy Bicep template'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Deploying $(serviceName) infrastructure to dev"
+                
+                # Deploy infrastructure
+                az deployment sub create \
+                  --location $(location) \
+                  --template-file infra/service.bicep \
+                  --parameters environment=dev \
+                  --parameters serviceName=$(serviceName) \
+                  --parameters jwtSecret=$(JWT_SECRET) \
+                  --parameters enableSqlDatabase=true \
+                  --parameters sqlAdminPassword=$(SQL_ADMIN_PASSWORD)
+                
+                # Get Function App name from deployment output
+                FUNCTION_APP_NAME=$(az deployment sub show \
+                  --name service \
+                  --query properties.outputs.functionAppName.value -o tsv)
+                
+                echo "##vso[task.setvariable variable=functionAppName;isOutput=true]$FUNCTION_APP_NAME"
+            name: infraOutput
+
+      # Deploy application
+      - deployment: DeployAppDev
+        displayName: 'Deploy DEV Application'
+        dependsOn: DeployInfrastructureDev
+        environment: 'dev'
+        pool:
+          vmImage: 'ubuntu-latest'
+        variables:
+          functionAppName: $[ dependencies.DeployInfrastructureDev.outputs['infraOutput.functionAppName'] ]
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: pipelines/steps/deploy-function-app.yml@templates
+                  parameters:
+                    azureSubscription: $(azureSubscription)
+                    functionAppName: $(functionAppName)
+                    package: '$(Pipeline.Workspace)/drop/$(serviceName).zip'
+
+  # Deploy to Test
+  - stage: DeployTest
+    displayName: 'Deploy to TEST'
+    dependsOn: DeployDev
+    condition: succeeded()
+    jobs:
+      - job: DeployInfrastructureTest
+        displayName: 'Deploy TEST Infrastructure'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: templates
+
+          - task: AzureCLI@2
+            displayName: 'Deploy Bicep template'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az deployment sub create \
+                  --location $(location) \
+                  --template-file infra/service.bicep \
+                  --parameters environment=test \
+                  --parameters serviceName=$(serviceName) \
+                  --parameters jwtSecret=$(JWT_SECRET) \
+                  --parameters enableSqlDatabase=true \
+                  --parameters sqlAdminPassword=$(SQL_ADMIN_PASSWORD)
+                
+                FUNCTION_APP_NAME=$(az deployment sub show \
+                  --name service \
+                  --query properties.outputs.functionAppName.value -o tsv)
+                
+                echo "##vso[task.setvariable variable=functionAppName;isOutput=true]$FUNCTION_APP_NAME"
+            name: infraOutput
+
+      - deployment: DeployAppTest
+        displayName: 'Deploy TEST Application'
+        dependsOn: DeployInfrastructureTest
+        environment: 'test'
+        pool:
+          vmImage: 'ubuntu-latest'
+        variables:
+          functionAppName: $[ dependencies.DeployInfrastructureTest.outputs['infraOutput.functionAppName'] ]
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: pipelines/steps/deploy-function-app.yml@templates
+                  parameters:
+                    azureSubscription: $(azureSubscription)
+                    functionAppName: $(functionAppName)
+                    package: '$(Pipeline.Workspace)/drop/$(serviceName).zip'

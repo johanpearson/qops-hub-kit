@@ -1,0 +1,46 @@
+# Prepare Node.js Step Template
+# Installs Node.js, authenticates with npm, and installs dependencies
+
+parameters:
+  - name: nodeVersion
+    type: string
+    default: '22.x'
+    displayName: 'Node.js version'
+  
+  - name: workingDirectory
+    type: string
+    default: ''
+    displayName: 'Working directory (optional)'
+  
+  - name: useNpmrc
+    type: boolean
+    default: true
+    displayName: 'Authenticate with .npmrc file'
+
+steps:
+  - task: NodeTool@0
+    displayName: 'Install Node.js ${{ parameters.nodeVersion }}'
+    inputs:
+      versionSpec: ${{ parameters.nodeVersion }}
+
+  - ${{ if eq(parameters.useNpmrc, true) }}:
+    - task: npmAuthenticate@0
+      displayName: 'Authenticate with Azure Artifacts'
+      inputs:
+        workingFile: ${{ parameters.workingDirectory }}/.npmrc
+      condition: and(succeeded(), ne('${{ parameters.workingDirectory }}', ''))
+
+    - task: npmAuthenticate@0
+      displayName: 'Authenticate with Azure Artifacts'
+      inputs:
+        workingFile: .npmrc
+      condition: and(succeeded(), eq('${{ parameters.workingDirectory }}', ''))
+
+  - script: npm ci
+    displayName: 'Install dependencies (npm ci)'
+    workingDirectory: ${{ parameters.workingDirectory }}
+    condition: ne('${{ parameters.workingDirectory }}', '')
+
+  - script: npm ci
+    displayName: 'Install dependencies (npm ci)'
+    condition: eq('${{ parameters.workingDirectory }}', '')

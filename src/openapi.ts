@@ -34,6 +34,23 @@ export interface RouteDefinition {
    */
   requestBody?: z.ZodTypeAny;
   /**
+   * Form data schema for file uploads (Zod object schema)
+   * When specified, generates multipart/form-data request body
+   */
+  formDataSchema?: z.ZodObject<any>;
+  /**
+   * File upload fields configuration
+   * Maps field name to file configuration
+   */
+  fileUploads?: Record<
+    string,
+    {
+      description?: string;
+      required?: boolean;
+      multiple?: boolean;
+    }
+  >;
+  /**
    * Query parameters schema (Zod object schema)
    */
   queryParams?: z.ZodObject<any>;
@@ -107,15 +124,49 @@ export class OpenApiBuilder {
    * @param route - Route definition
    */
   registerRoute(route: RouteDefinition): void {
-    const requestBody = route.requestBody
-      ? {
-          content: {
-            'application/json': {
-              schema: route.requestBody,
-            },
-          },
+    let requestBody;
+
+    // Handle multipart/form-data for file uploads
+    if (route.formDataSchema || route.fileUploads) {
+      // Build schema combining form data fields and file uploads
+      let combinedSchema = route.formDataSchema || z.object({});
+
+      // Add file upload fields to the schema
+      if (route.fileUploads) {
+        const fileFields: Record<string, z.ZodTypeAny> = {};
+        for (const [fieldName, fileConfig] of Object.entries(route.fileUploads)) {
+          // File uploads are represented as strings with binary format in OpenAPI
+          const baseFileSchema = z.string().openapi({
+            type: 'string',
+            format: 'binary',
+            description: fileConfig.description,
+          });
+
+          fileFields[fieldName] = fileConfig.required ? baseFileSchema : baseFileSchema.optional();
         }
-      : undefined;
+
+        // Merge file fields with form data fields
+        const fileFieldsSchema = z.object(fileFields);
+        combinedSchema = combinedSchema.merge(fileFieldsSchema);
+      }
+
+      requestBody = {
+        content: {
+          'multipart/form-data': {
+            schema: combinedSchema,
+          },
+        },
+      };
+    } else if (route.requestBody) {
+      // Regular JSON request body
+      requestBody = {
+        content: {
+          'application/json': {
+            schema: route.requestBody,
+          },
+        },
+      };
+    }
 
     const responses: any = {};
     for (const [statusCode, response] of Object.entries(route.responses)) {

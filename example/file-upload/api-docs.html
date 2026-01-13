@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload API Documentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+        }
+        
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .version {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        h2 {
+            color: #667eea;
+            margin: 30px 0 15px 0;
+            font-size: 24px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .endpoint {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .method {
+            display: inline-block;
+            padding: 5px 15px;
+            background: #28a745;
+            color: white;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .path {
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .description {
+            margin: 15px 0;
+            color: #666;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .required {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .optional {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        pre {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 20px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .example-section {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .file-upload-preview {
+            background: #e7f3ff;
+            border: 2px dashed #667eea;
+            padding: 30px;
+            text-align: center;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .file-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📤 File Upload API</h1>
+            <div class="version">Version 1.0.0</div>
+            <p style="margin-top: 10px; opacity: 0.9;">
+                Azure Functions API demonstrating file upload with multipart/form-data using @qops/hub-kit
+            </p>
+        </header>
+        
+        <div class="content">
+            <h2>📋 Overview</h2>
+            <p>
+                This API demonstrates how to implement file upload functionality in Azure Functions using the 
+                <code>@qops/hub-kit</code> library. It supports multipart/form-data requests with file uploads 
+                and form field validation using Zod schemas.
+            </p>
+            
+            <h2>🚀 Endpoints</h2>
+            
+            <div class="endpoint">
+                <div>
+                    <span class="method">POST</span>
+                    <span class="path">/api/upload</span>
+                    <span class="badge badge-success">Multipart/Form-Data</span>
+                </div>
+                <div class="description">
+                    <strong>Upload file with metadata</strong><br>
+                    Upload one or more files along with metadata using multipart/form-data
+                </div>
+                
+                <h3 style="margin-top: 20px; color: #667eea;">Request Parameters</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Type</th>
+                            <th>Required</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>title</code></td>
+                            <td>string</td>
+                            <td><span class="required">✓ Required</span></td>
+                            <td>Title of the upload (minimum 1 character)</td>
+                        </tr>
+                        <tr>
+                            <td><code>description</code></td>
+                            <td>string</td>
+                            <td><span class="optional">Optional</span></td>
+                            <td>Optional description of the upload</td>
+                        </tr>
+                        <tr>
+                            <td><code>category</code></td>
+                            <td>enum</td>
+                            <td><span class="optional">Optional</span></td>
+                            <td>Category: <code>document</code>, <code>image</code>, or <code>other</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>file</code></td>
+                            <td>binary</td>
+                            <td><span class="required">✓ Required</span></td>
+                            <td>File(s) to upload (supports multiple files)</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="file-upload-preview">
+                    <div class="file-icon">📁</div>
+                    <div><strong>File Upload Field</strong></div>
+                    <div style="color: #666; font-size: 14px; margin-top: 8px;">
+                        Click to select one or more files from your computer
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 20px; color: #667eea;">Response (200 OK)</h3>
+                <pre>{
+  "success": true,
+  "message": "Files uploaded successfully",
+  "uploadedFiles": [
+    {
+      "filename": "example.txt",
+      "size": 1024,
+      "mimeType": "text/plain"
+    }
+  ],
+  "metadata": {
+    "title": "My Document",
+    "description": "A test document",
+    "category": "document"
+  }
+}</pre>
+            </div>
+            
+            <h2>💡 Example Usage</h2>
+            
+            <div class="example-section">
+                <h3 style="margin-bottom: 15px; color: #856404;">Using curl</h3>
+                <pre style="background: #fff; color: #333; border: 1px solid #ddd;">curl -X POST http://localhost:7071/api/upload \
+  -F "title=My Document" \
+  -F "description=A test document" \
+  -F "category=document" \
+  -F "file=@/path/to/your/file.txt"</pre>
+            </div>
+            
+            <div class="example-section">
+                <h3 style="margin-bottom: 15px; color: #856404;">Multiple Files</h3>
+                <pre style="background: #fff; color: #333; border: 1px solid #ddd;">curl -X POST http://localhost:7071/api/upload \
+  -F "title=Multiple Files" \
+  -F "file=@/path/to/file1.txt" \
+  -F "file=@/path/to/file2.pdf"</pre>
+            </div>
+            
+            <h2>🔧 Implementation Details</h2>
+            <p>
+                This API is built using <code>@qops/hub-kit</code>, which provides:
+            </p>
+            <ul style="margin: 15px 0 15px 30px;">
+                <li>✅ Automatic parsing of multipart/form-data requests</li>
+                <li>✅ File buffer access with metadata (filename, size, MIME type)</li>
+                <li>✅ Zod schema validation for form fields</li>
+                <li>✅ OpenAPI 3.0 documentation with proper file upload support</li>
+                <li>✅ Correlation IDs for request tracking</li>
+                <li>✅ Consistent error handling</li>
+            </ul>
+            
+            <h2>📚 Resources</h2>
+            <ul style="margin: 15px 0 15px 30px;">
+                <li><a href="/api/openapi.json" style="color: #667eea; text-decoration: none;">View OpenAPI 3.0 Specification</a></li>
+                <li><a href="https://github.com/johanpearson/qops-hub-kit" style="color: #667eea; text-decoration: none;">@qops/hub-kit on GitHub</a></li>
+                <li><a href="https://learn.microsoft.com/azure/azure-functions/" style="color: #667eea; text-decoration: none;">Azure Functions Documentation</a></li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

@@ -35,9 +35,40 @@ export interface HandlerConfig {
    */
   querySchema?: z.ZodObject<any>;
   /**
+   * Form data validation schema (for multipart/form-data)
+   * When specified, the handler will parse form data instead of JSON body
+   */
+  formDataSchema?: z.ZodObject<any>;
+  /**
    * Enable request/response logging
    */
   enableLogging?: boolean;
+}
+
+/**
+ * Uploaded file information
+ */
+export interface UploadedFile {
+  /**
+   * Field name from the form
+   */
+  fieldName: string;
+  /**
+   * Original filename
+   */
+  filename: string;
+  /**
+   * MIME type
+   */
+  mimeType: string;
+  /**
+   * File size in bytes
+   */
+  size: number;
+  /**
+   * File content as Buffer
+   */
+  buffer: Buffer;
 }
 
 /**
@@ -52,6 +83,14 @@ export interface ParsedRequest {
    * Parsed query parameters (if validated)
    */
   query?: any;
+  /**
+   * Parsed form data fields (if form data is used)
+   */
+  formData?: any;
+  /**
+   * Uploaded files (if form data with files is used)
+   */
+  files?: UploadedFile[];
   /**
    * Authenticated user (if auth is enabled)
    */
@@ -210,6 +249,42 @@ export function createHandler(
           throw new AppError(ErrorCode.BAD_REQUEST, 'Invalid JSON in request body');
         }
         parsedData.body = config.bodySchema.parse(body);
+      }
+
+      if (config.formDataSchema) {
+        let formData;
+        try {
+          formData = await request.formData();
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_error) {
+          throw new AppError(ErrorCode.BAD_REQUEST, 'Invalid multipart/form-data in request body');
+        }
+
+        // Extract files and regular fields separately
+        const fields: Record<string, any> = {};
+        const files: UploadedFile[] = [];
+
+        for (const [key, value] of formData.entries()) {
+          if (value instanceof File) {
+            // Handle file upload
+            // Note: This loads the entire file into memory. For large files (>100MB),
+            // consider implementing streaming or adding file size validation
+            const arrayBuffer = await value.arrayBuffer();
+            files.push({
+              fieldName: key,
+              filename: value.name,
+              mimeType: value.type,
+              size: value.size,
+              buffer: Buffer.from(arrayBuffer),
+            });
+          } else {
+            // Handle regular form field
+            fields[key] = value;
+          }
+        }
+
+        parsedData.formData = config.formDataSchema.parse(fields);
+        parsedData.files = files;
       }
 
       if (config.querySchema) {

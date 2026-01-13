@@ -7,6 +7,7 @@ A lightweight utility package for creating Azure Function v4 APIs with TypeScrip
 ✅ **Simple Handler Wrapper** - Single function that handles all middleware  
 ✅ **JWT Authentication** - Built-in token verification with role-based access control  
 ✅ **Request Validation** - Type-safe validation using Zod schemas  
+✅ **File Upload Support** - Multipart/form-data parsing with OpenAPI documentation  
 ✅ **Error Handling** - Consistent error responses with HTTP status mapping  
 ✅ **Correlation IDs** - Automatic request tracking for distributed tracing  
 ✅ **OpenAPI Support** - Generate OpenAPI v3 documentation from Zod schemas  
@@ -216,7 +217,66 @@ const handler = createHandler(
 );
 ```
 
-### 4. OpenAPI Documentation
+### 4. File Upload with Multipart/Form-Data
+
+```typescript
+import { createHandler, UploadedFile, z } from '@qops/hub-kit';
+
+const formFieldsSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+});
+
+const handler = createHandler(
+  async (request, context, { files, formFields }) => {
+    // files: UploadedFile[] - uploaded files with buffer, filename, mimeType, size
+    // formFields: validated form fields
+
+    // Process files (e.g., save to blob storage)
+    const processedFiles = files?.map((file) => ({
+      filename: file.filename,
+      size: file.size,
+      buffer: file.buffer, // File content as Buffer
+    }));
+
+    return {
+      status: 201,
+      jsonBody: { uploaded: processedFiles },
+    };
+  },
+  {
+    enableFileUpload: true,
+    formFieldsSchema,
+  },
+);
+```
+
+**With OpenAPI Documentation:**
+
+```typescript
+builder.registerRoute({
+  method: 'POST',
+  path: '/api/upload',
+  summary: 'Upload files',
+  enableFileUpload: true,
+  formFieldsSchema: formFieldsSchema,
+  fileFields: [
+    {
+      name: 'file',
+      description: 'File to upload',
+      required: true,
+    },
+  ],
+  responses: {
+    201: { description: 'Uploaded successfully' },
+  },
+});
+// Generates multipart/form-data with file picker in Swagger UI!
+```
+
+📚 **See [FILE_UPLOAD_GUIDE.md](./FILE_UPLOAD_GUIDE.md) for complete documentation and [example/file-upload-demo](./example/file-upload-demo) for working code.**
+
+### 5. OpenAPI Documentation
 
 ```typescript
 import { OpenApiBuilder, z } from '@qops/hub-kit';
@@ -241,7 +301,7 @@ builder.registerRoute({
 const openApiDoc = builder.generateDocument();
 ```
 
-### 5. Error Handling
+### 6. Error Handling
 
 ```typescript
 import { AppError, ErrorCode } from '@qops/hub-kit';
@@ -257,7 +317,7 @@ throw new AppError(ErrorCode.VALIDATION_ERROR, 'Invalid email', { field: 'email'
 // INTERNAL_ERROR → 500
 ```
 
-### 6. Correlation IDs (Automatic)
+### 7. Correlation IDs (Automatic)
 
 Every request automatically gets a correlation ID for distributed tracing:
 

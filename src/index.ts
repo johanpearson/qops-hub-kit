@@ -8,7 +8,7 @@
  */
 
 // Core handler
-export { createHandler, HandlerConfig, HandlerFunction, ParsedRequest } from './handler.js';
+export { createHandler, HandlerConfig, HandlerFunction, ParsedRequest, UploadedFile } from './handler.js';
 
 // Route builder (service/route pattern)
 export { RouteBuilder, Route, RouteHandler, ServiceFunction, createRouteHandler } from './routes.js';

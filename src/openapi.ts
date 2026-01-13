@@ -42,6 +42,22 @@ export interface RouteDefinition {
    */
   pathParams?: z.ZodObject<any>;
   /**
+   * Enable file upload (multipart/form-data)
+   */
+  enableFileUpload?: boolean;
+  /**
+   * Form fields schema (for multipart/form-data)
+   */
+  formFieldsSchema?: z.ZodObject<any>;
+  /**
+   * File upload field definitions
+   */
+  fileFields?: Array<{
+    name: string;
+    description?: string;
+    required?: boolean;
+  }>;
+  /**
    * Response schemas by status code
    */
   responses: {
@@ -107,15 +123,73 @@ export class OpenApiBuilder {
    * @param route - Route definition
    */
   registerRoute(route: RouteDefinition): void {
-    const requestBody = route.requestBody
-      ? {
-          content: {
-            'application/json': {
-              schema: route.requestBody,
+    let requestBody: any = undefined;
+
+    if (route.enableFileUpload) {
+      // Build multipart/form-data schema
+      const properties: any = {};
+      const required: string[] = [];
+
+      // Add file fields
+      if (route.fileFields) {
+        for (const fileField of route.fileFields) {
+          properties[fileField.name] = {
+            type: 'string',
+            format: 'binary',
+            description: fileField.description || 'File to upload',
+          };
+          if (fileField.required) {
+            required.push(fileField.name);
+          }
+        }
+      }
+
+      // Add form fields from schema
+      if (route.formFieldsSchema) {
+        const shape = route.formFieldsSchema.shape || route.formFieldsSchema._def?.shape?.();
+        if (shape) {
+          for (const [key, zodType] of Object.entries(shape as Record<string, any>)) {
+            // Simple type mapping - extend as needed
+            let type = 'string';
+            if (zodType._def?.typeName === 'ZodNumber') {
+              type = 'number';
+            } else if (zodType._def?.typeName === 'ZodBoolean') {
+              type = 'boolean';
+            }
+
+            properties[key] = {
+              type,
+              description: zodType._def?.description || undefined,
+            };
+
+            // Check if field is required (not optional)
+            if (!zodType._def?.typeName?.includes('Optional') && !zodType.isOptional?.()) {
+              required.push(key);
+            }
+          }
+        }
+      }
+
+      requestBody = {
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties,
+              ...(required.length > 0 && { required }),
             },
           },
-        }
-      : undefined;
+        },
+      };
+    } else if (route.requestBody) {
+      requestBody = {
+        content: {
+          'application/json': {
+            schema: route.requestBody,
+          },
+        },
+      };
+    }
 
     const responses: any = {};
     for (const [statusCode, response] of Object.entries(route.responses)) {

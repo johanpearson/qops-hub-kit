@@ -15,6 +15,32 @@ import { extractBearerToken, verifyToken, verifyRole, setAuthUser, JwtConfig, Us
 export type HandlerFunction = (request: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>;
 
 /**
+ * Uploaded file information
+ */
+export interface UploadedFile {
+  /**
+   * Field name from the form
+   */
+  fieldName: string;
+  /**
+   * Original filename
+   */
+  filename: string;
+  /**
+   * MIME type
+   */
+  mimeType: string;
+  /**
+   * File size in bytes
+   */
+  size: number;
+  /**
+   * File content as Buffer
+   */
+  buffer: Buffer;
+}
+
+/**
  * Handler configuration
  */
 export interface HandlerConfig {
@@ -34,6 +60,14 @@ export interface HandlerConfig {
    * Query parameters validation schema
    */
   querySchema?: z.ZodObject<any>;
+  /**
+   * Enable multipart/form-data parsing for file uploads
+   */
+  enableFileUpload?: boolean;
+  /**
+   * Validation schema for form fields (when enableFileUpload is true)
+   */
+  formFieldsSchema?: z.ZodObject<any>;
   /**
    * Enable request/response logging
    */
@@ -60,6 +94,14 @@ export interface ParsedRequest {
    * Correlation ID
    */
   correlationId: string;
+  /**
+   * Uploaded files (if enableFileUpload is true)
+   */
+  files?: UploadedFile[];
+  /**
+   * Form fields (if enableFileUpload is true)
+   */
+  formFields?: Record<string, string>;
 }
 
 /**
@@ -82,6 +124,42 @@ function addCorrelationHeader(context: InvocationContext, response: HttpResponse
       [CORRELATION_ID_HEADER]: correlationId,
     },
   };
+}
+
+/**
+ * Parse multipart form data and extract files and fields
+ *
+ * @param request - The HTTP request
+ * @returns Parsed files and form fields
+ */
+async function parseMultipartFormData(request: HttpRequest): Promise<{
+  files: UploadedFile[];
+  formFields: Record<string, string>;
+}> {
+  const formData = await request.formData();
+  const files: UploadedFile[] = [];
+  const formFields: Record<string, string> = {};
+
+  for (const [key, value] of formData.entries()) {
+    if (value instanceof File) {
+      // It's a file
+      const arrayBuffer = await value.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      files.push({
+        fieldName: key,
+        filename: value.name,
+        mimeType: value.type,
+        size: value.size,
+        buffer,
+      });
+    } else {
+      // It's a regular form field
+      formFields[key] = value.toString();
+    }
+  }
+
+  return { files, formFields };
 }
 
 /**
@@ -201,7 +279,24 @@ export function createHandler(
       }
 
       // 3. Request validation
-      if (config.bodySchema) {
+      if (config.enableFileUpload) {
+        // Parse multipart/form-data
+        try {
+          const { files, formFields } = await parseMultipartFormData(request);
+          parsedData.files = files;
+          parsedData.formFields = formFields;
+
+          // Validate form fields if schema provided
+          if (config.formFieldsSchema) {
+            parsedData.formFields = config.formFieldsSchema.parse(formFields);
+          }
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            throw error;
+          }
+          throw new AppError(ErrorCode.BAD_REQUEST, 'Invalid multipart/form-data');
+        }
+      } else if (config.bodySchema) {
         let body;
         try {
           body = await request.json();

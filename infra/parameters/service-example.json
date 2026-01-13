@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "serviceName": {
-      "value": "profile"
+      "value": "myservice"
     },
     "environment": {
       "value": "dev"
@@ -17,29 +17,6 @@
           "id": "/subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.KeyVault/vaults/{kv-name}"
         },
         "secretName": "jwt-secret"
-      }
-    },
-    "enableCosmosDb": {
-      "value": false
-    },
-    "enableSqlDatabase": {
-      "value": true
-    },
-    "databaseType": {
-      "value": "postgresql"
-    },
-    "sqlDatabaseName": {
-      "value": "profiledb"
-    },
-    "sqlAdminUsername": {
-      "value": "sqladmin"
-    },
-    "sqlAdminPassword": {
-      "reference": {
-        "keyVault": {
-          "id": "/subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.KeyVault/vaults/{kv-name}"
-        },
-        "secretName": "sql-admin-password"
       }
     },
     "functionAppSku": {

@@ -6,6 +6,8 @@ This folder contains reusable Bicep templates for deploying Azure Functions and 
 
 The infrastructure is organized into modular Bicep templates that can be used by individual service repositories to deploy their Azure resources. Each service repository will reference these templates to deploy its own infrastructure independently.
 
+**Cost-optimized**: All templates use the cheapest SKUs (Consumption plan, Standard_LRS storage) suitable for all environments.
+
 ## Architecture
 
 ### Resource Group Structure
@@ -14,16 +16,12 @@ For each environment (dev, test, prod), the following resource groups are create
 
 - **Common Resource Group** (`rg-qops-common-{env}-{region}`):
   - Shared Key Vault for JWT secrets
-  - Shared Application Insights (optional)
-  - Shared Storage Account (optional)
 
 - **Service Resource Groups** (`rg-qops-{service}-{env}-{region}`):
-  - Azure Function App
-  - App Service Plan
+  - Azure Function App (Consumption plan)
+  - App Service Plan (Dynamic/Consumption)
   - Application Insights (service-specific)
-  - Storage Account (for function storage)
-  - Optional: Cosmos DB (for document service)
-  - Optional: Azure SQL/PostgreSQL (for other services)
+  - Storage Account (includes blob and table storage)
 
 ### Regions
 
@@ -37,14 +35,13 @@ Default regions:
 
 - **`modules/resource-group.bicep`**: Creates a resource group with tags
 - **`modules/key-vault.bicep`**: Deploys Azure Key Vault for secrets
-- **`modules/function-app.bicep`**: Deploys Azure Function App with App Service Plan and monitoring
-- **`modules/cosmos-db.bicep`**: Deploys Cosmos DB for document storage
-- **`modules/sql-database.bicep`**: Deploys Azure SQL Database or PostgreSQL
-- **`modules/storage-account.bicep`**: Deploys Storage Account for function storage
+- **`modules/function-app.bicep`**: Deploys Azure Function App (Consumption plan) with monitoring
+- **`modules/storage-account.bicep`**: Deploys Storage Account with blob and table storage (Standard_LRS)
+- **`modules/app-insights.bicep`**: Deploys Application Insights for monitoring
 
 ### Main Templates
 
-- **`common-resources.bicep`**: Deploys common/shared resources (Key Vault, etc.) - Deploy once per environment
+- **`common-resources.bicep`**: Deploys common/shared resources (Key Vault) - Deploy once per environment
 - **`service.bicep`**: Deploys a single service with its Azure Function App - Used by each service repository
 
 ## Usage
@@ -73,24 +70,13 @@ az deployment sub create \
 Each service repository should reference these templates to deploy its own infrastructure:
 
 ```bash
-# Deploy profile service to dev
+# Deploy your service to dev
 az deployment sub create \
   --location swedencentral \
   --template-file infra/service.bicep \
   --parameters environment=dev \
-  --parameters serviceName=profile \
-  --parameters jwtSecret="your-secret-here" \
-  --parameters enableSqlDatabase=true \
-  --parameters sqlAdminPassword="your-password-here"
-
-# Deploy document service to dev
-az deployment sub create \
-  --location swedencentral \
-  --template-file infra/service.bicep \
-  --parameters environment=dev \
-  --parameters serviceName=document \
-  --parameters jwtSecret="your-secret-here" \
-  --parameters enableCosmosDb=true
+  --parameters serviceName=myservice \
+  --parameters jwtSecret="your-secret-here"
 ```
 
 ### Using from Service Repositories
@@ -113,23 +99,22 @@ steps:
       inlineScript: |
         az deployment sub create \
           --template-file infra/service.bicep \
-          --parameters ...
+          --parameters environment=dev \
+          --parameters serviceName=myservice
 ```
 
 ## Parameter Files
 
-Example parameter files are located in `infra/parameters/` to help you get started. Copy and modify these for your service:
+Example parameter file is located in `infra/parameters/`:
 
 - `common-dev.json`: Common resources parameters (deploy once)
-- `profile-service-dev.json`: Example for profile service
-- `document-service-dev.json`: Example for document service with Cosmos DB
+- `service-example.json`: Example service parameters template
 
 ### Customizing for Your Service
 
-1. Copy an example parameter file
-2. Update the `serviceName` parameter
-3. Configure database options (`enableCosmosDb`, `enableSqlDatabase`)
-4. Store secrets in Azure Key Vault and reference them
+1. Copy `service-example.json`
+2. Update the `serviceName` parameter to your service name
+3. Store secrets in Azure Key Vault and reference them
 
 ### Example Parameter Structure
 
@@ -145,7 +130,7 @@ Example parameter files are located in `infra/parameters/` to help you get start
       "value": "swedencentral"
     },
     "serviceName": {
-      "value": "profile"
+      "value": "myservice"
     }
   }
 }
@@ -160,7 +145,13 @@ After deployment, configure these environment variables in your Function App:
 - `WEBSITE_NODE_DEFAULT_VERSION`: `~22`
 - `APPINSIGHTS_INSTRUMENTATIONKEY`: Auto-configured by Bicep
 
-For Azure service integrations (Cosmos DB, SQL, etc.), see the [Azure Integrations Guide](../docs/INTEGRATIONS.md) in the hub-kit library.
+## Storage Access
+
+The storage account created includes:
+- **Blob Storage**: For file storage and Azure Functions artifacts
+- **Table Storage**: For structured NoSQL data storage
+
+Access via connection string output from deployment or through Azure Portal.
 
 ## Tags
 
@@ -174,15 +165,19 @@ All resources are tagged with:
 1. **Never commit secrets**: Use Key Vault references in app settings
 2. **Use managed identities**: Enable system-assigned identity for Function Apps
 3. **Separate environments**: Use different resource groups per environment
-4. **Cost optimization**: Use consumption plan for dev/test, premium for prod
+4. **Cost optimization**: Uses Consumption plan and Standard_LRS storage (cheapest options)
 5. **Monitoring**: Always enable Application Insights
 
 ## Cost Considerations
 
-- **Consumption Plan**: Pay per execution (best for dev/test)
-- **Premium Plan**: Always-on, better performance (recommended for production)
-- **Cosmos DB**: Can be expensive, use serverless for small workloads
-- **Azure SQL**: Use serverless tier for dev/test environments
+All resources use the cheapest SKUs suitable for all environments:
+
+- **Azure Functions**: Consumption plan (Y1) - Pay per execution
+- **Storage Account**: Standard_LRS - Locally redundant storage (cheapest)
+- **Application Insights**: Pay-as-you-go
+- **Key Vault**: Standard tier
+
+**Estimated monthly cost per service**: $5-20 depending on usage
 
 ## CI/CD Integration
 

@@ -108,9 +108,7 @@ az deployment sub create \
   --template-file ../qops-hub-kit/infra/service.bicep \
   --parameters environment=dev \
   --parameters serviceName=myservice \
-  --parameters jwtSecret="your-secret" \
-  --parameters enableSqlDatabase=true \
-  --parameters sqlAdminPassword="your-password"
+  --parameters jwtSecret="your-secret"
 ```
 
 ### Option B: Use Pipeline
@@ -180,10 +178,9 @@ stages:
                   --template-file infra/service.bicep \
                   --parameters environment=dev \
                   --parameters serviceName=$(serviceName) \
-                  --parameters jwtSecret="$(JWT_SECRET)" \
-                  --parameters enableSqlDatabase=true
+                  --parameters jwtSecret="$(JWT_SECRET)"
 
-      # Deploy code
+      # Deploy application
       - deployment: DeployApp
         dependsOn: DeployInfra
         environment: dev
@@ -207,7 +204,6 @@ stages:
 1. Create a Variable Group named `qops-secrets-dev`
 2. Add variables:
    - `JWT_SECRET`: Your JWT secret
-   - `SQL_ADMIN_PASSWORD`: Database password
 3. Link the variable group to your pipeline
 
 ### In Azure Key Vault (Recommended)
@@ -244,10 +240,18 @@ curl $FUNCTION_URL/api/openapi.json
 
 # Test your endpoint (with JWT token)
 curl -X POST $FUNCTION_URL/api/items \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"Test Item","description":"Testing"}'
 ```
+
+## Storage Access
+
+Your Function App includes storage with:
+- **Blob Storage**: For file uploads and storage
+- **Table Storage**: For structured NoSQL data
+
+Access via the connection string from your Function App settings.
 
 ## Monitoring
 
@@ -258,21 +262,20 @@ Your Function App includes Application Insights:
 3. Click "Application Insights"
 4. View logs, metrics, and traces
 
-## Cost Optimization (Serverless)
+## Cost Optimization
 
-All templates use serverless by default:
+All templates use the cheapest SKUs:
 
 - **Azure Functions**: Consumption plan (pay per execution)
-- **Cosmos DB**: Serverless mode (pay per RU/s)
-- **Azure SQL**: Serverless with auto-pause
+- **Storage**: Standard_LRS (locally redundant, cheapest)
+- **Application Insights**: Pay-as-you-go
 
 Typical costs for dev environment:
 - Azure Functions: $0-10/month
-- Cosmos DB Serverless: $0-20/month
-- Azure SQL Serverless: $5-15/month
+- Storage: $0-5/month
 - Application Insights: $0-5/month
 
-**Total: ~$10-50/month for a dev environment**
+**Total: ~$5-20/month for a dev environment**
 
 ## Multiple Environments
 
@@ -294,11 +297,10 @@ Configure environment approvals in Azure DevOps for test and prod.
 ## Next Steps
 
 - Add more endpoints to your service
-- Implement database integration (see [Azure Integrations](./docs/INTEGRATIONS.md))
-- Add automated tests
 - Configure custom domains
 - Set up monitoring alerts
 - Implement API versioning
+- Add automated E2E tests
 
 ## Troubleshooting
 
@@ -313,14 +315,13 @@ Configure environment approvals in Azure DevOps for test and prod.
 - Check Node.js version matches (should be 22.x)
 - Verify npm dependencies are installed
 
-### Database connection issues
-- Check firewall rules allow Azure services
-- Verify connection string in app settings
-- Check managed identity permissions
+### Storage connection issues
+- Check connection string in app settings
+- Verify storage account is created
+- Check managed identity permissions if using
 
 ## Support
 
 - Infrastructure issues: See `/infra/README.md`
 - Pipeline issues: See `/pipelines/README.md`
 - Library issues: See main README.md
-- Azure integrations: See `/docs/INTEGRATIONS.md`

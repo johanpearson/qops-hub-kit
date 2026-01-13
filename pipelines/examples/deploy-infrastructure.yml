@@ -19,17 +19,7 @@ parameters:
   - name: serviceName
     displayName: 'Service name'
     type: string
-    default: 'profile'
-  
-  - name: enableCosmosDb
-    displayName: 'Enable Cosmos DB'
-    type: boolean
-    default: false
-  
-  - name: enableSqlDatabase
-    displayName: 'Enable SQL Database'
-    type: boolean
-    default: true
+    default: 'myservice'
 
 variables:
   - name: location
@@ -99,9 +89,6 @@ stages:
                   --parameters serviceName=${{ parameters.serviceName }} \
                   --parameters location=$(location) \
                   --parameters jwtSecret="$(JWT_SECRET)" \
-                  --parameters enableCosmosDb=${{ parameters.enableCosmosDb }} \
-                  --parameters enableSqlDatabase=${{ parameters.enableSqlDatabase }} \
-                  --parameters sqlAdminPassword="$(SQL_ADMIN_PASSWORD)"
                 
                 echo ""
                 echo "✅ Infrastructure deployment complete!"

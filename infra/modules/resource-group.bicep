@@ -10,7 +10,7 @@ param location string
 @description('Environment (dev, test, prod)')
 param environment string
 
-@description('Service name (e.g., profile, document, calendar)')
+@description('Service name')
 param serviceName string = 'common'
 
 @description('Additional tags to apply to the resource group')

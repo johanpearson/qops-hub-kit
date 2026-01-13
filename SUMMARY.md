@@ -2,7 +2,7 @@
 
 ## What Was Added
 
-This PR adds reusable infrastructure and CI/CD templates to the qops-hub-kit repository, enabling individual service repositories to deploy Azure Functions with a serverless-first approach.
+This PR adds reusable infrastructure and CI/CD templates to the qops-hub-kit repository, enabling individual service repositories to deploy Azure Functions with cost-optimized infrastructure.
 
 ## Structure
 
@@ -14,16 +14,13 @@ infra/
 ├── service.bicep                       # Single service deployment
 ├── modules/                            # Modular Bicep templates
 │   ├── resource-group.bicep
-│   ├── storage-account.bicep
+│   ├── storage-account.bicep          # Blob & Table storage (Standard_LRS)
 │   ├── app-insights.bicep
 │   ├── key-vault.bicep
-│   ├── function-app.bicep             # Serverless Functions
-│   ├── cosmos-db.bicep                # Serverless Cosmos DB
-│   └── sql-database.bicep             # Serverless SQL/PostgreSQL
+│   └── function-app.bicep             # Serverless Functions (Consumption)
 └── parameters/                         # Example parameter files
     ├── common-dev.json
-    ├── profile-service-dev.json
-    └── document-service-dev.json
+    └── service-example.json
 ```
 
 ### Pipeline Templates (`/pipelines`)
@@ -51,11 +48,12 @@ pipelines/
 
 ## Key Features
 
-### Serverless-First Approach
-- **Azure Functions**: Consumption plan (pay per execution)
-- **Cosmos DB**: Serverless mode (pay per RU/s)
-- **Azure SQL**: Serverless tier with auto-pause
-- **Cost**: ~$10-50/month for dev environments
+### Cost-Optimized for All Environments
+- **Azure Functions**: Consumption plan (Y1) - Pay per execution
+- **Storage**: Standard_LRS - Cheapest locally redundant storage
+- **Includes**: Blob storage and Table storage
+- **No databases**: Only blob and table storage for maximum simplicity
+- **Cost**: ~$5-20/month per environment
 
 ### Designed for Individual Services
 - Each service repository references these templates
@@ -66,8 +64,8 @@ pipelines/
 ### Modular and Composable
 - Infrastructure modules can be mixed and matched
 - Pipeline steps can be used individually or combined
-- Support for different database types (Cosmos DB, SQL, PostgreSQL)
-- Optional components (databases, monitoring, etc.)
+- All templates use cheapest SKUs
+- Simple and generic - no service-specific configurations
 
 ### Comprehensive Documentation
 - `/infra/README.md`: Infrastructure templates guide
@@ -109,16 +107,24 @@ az deployment sub create \
 
 1. **Consistency**: All services use the same patterns and tools
 2. **Efficiency**: Reusable templates reduce duplication
-3. **Cost-effective**: Serverless architecture minimizes costs
+3. **Cost-effective**: Cheapest SKUs for all resources
 4. **Easy to use**: Comprehensive examples and documentation
 5. **Maintainable**: Changes to templates benefit all services
 6. **Scalable**: Easy to add new services following the same pattern
 
+## Storage Support
+
+- **Blob Storage**: For file uploads and binary data
+- **Table Storage**: For structured NoSQL data
+- No Cosmos DB or SQL databases - keeping it simple and cost-effective
+
 ## Files Changed
 
-- Added 27 new files (infrastructure, pipelines, documentation)
-- Updated main README.md with new sections
-- Created USAGE.md with end-to-end guide
+- Added infrastructure templates and modules
+- Added pipeline templates (steps, jobs, stages)
+- Added comprehensive documentation
+- Removed service-specific examples (profile, calendar, document)
+- Removed database modules (Cosmos DB, SQL) - only storage
 
 ## Testing
 

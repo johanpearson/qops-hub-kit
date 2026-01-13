@@ -18,7 +18,7 @@ variables:
   - name: nodeVersion
     value: '22.x'
   - name: serviceName
-    value: 'profile' # Your service name
+    value: 'myservice' # Your service name
   - name: azureSubscription
     value: 'Azure-Connection'
   - name: location
@@ -99,8 +99,6 @@ stages:
                   --parameters environment=dev \
                   --parameters serviceName=$(serviceName) \
                   --parameters jwtSecret=$(JWT_SECRET) \
-                  --parameters enableSqlDatabase=true \
-                  --parameters sqlAdminPassword=$(SQL_ADMIN_PASSWORD)
                 
                 # Get Function App name from deployment output
                 FUNCTION_APP_NAME=$(az deployment sub show \
@@ -155,8 +153,6 @@ stages:
                   --parameters environment=test \
                   --parameters serviceName=$(serviceName) \
                   --parameters jwtSecret=$(JWT_SECRET) \
-                  --parameters enableSqlDatabase=true \
-                  --parameters sqlAdminPassword=$(SQL_ADMIN_PASSWORD)
                 
                 FUNCTION_APP_NAME=$(az deployment sub show \
                   --name service \

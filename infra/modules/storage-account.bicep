@@ -1,5 +1,5 @@
 // Storage Account Module
-// Creates an Azure Storage Account for Azure Functions
+// Creates an Azure Storage Account with Blob and Table storage support
 
 @description('Name of the storage account (must be globally unique)')
 param storageAccountName string
@@ -42,6 +42,9 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     encryption: {
       services: {
         blob: {
+          enabled: true
+        }
+        table: {
           enabled: true
         }
         file: {

@@ -22,17 +22,17 @@ variables:
   - name: nodeVersion
     value: '22.x'
   - name: serviceName
-    value: 'profile' # Change to your service name
+    value: 'myservice' # Change to your service name
   - name: azureSubscription
     value: 'Azure-Connection' # Your Azure DevOps service connection
   
   # Function App names (get these from your infrastructure deployment)
   - name: functionAppNameDev
-    value: 'func-qops-profile-dev-xyz'
+    value: 'func-qops-myservice-dev-xyz'
   - name: functionAppNameTest
-    value: 'func-qops-profile-test-xyz'
+    value: 'func-qops-myservice-test-xyz'
   - name: functionAppNameProd
-    value: 'func-qops-profile-prod-xyz'
+    value: 'func-qops-myservice-prod-xyz'
 
 # Reference the qops-hub-kit repository for templates
 resources:

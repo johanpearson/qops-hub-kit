@@ -462,12 +462,10 @@ This repository also includes **reusable infrastructure and pipeline templates**
 
 Located in `/infra` - Modular Bicep templates for deploying Azure resources:
 
-- **Serverless Azure Functions** (Consumption plan)
-- **Cosmos DB** (serverless mode for document storage)
-- **Azure SQL/PostgreSQL** (serverless tier with auto-pause)
+- **Serverless Azure Functions** (Consumption plan - cheapest)
+- **Storage Account** (blob and table storage with Standard_LRS)
 - **Key Vault** (for shared secrets like JWT)
 - **Application Insights** (monitoring)
-- **Storage Accounts** (function storage)
 
 **Usage:** Reference from your service repository to deploy infrastructure independently.
 

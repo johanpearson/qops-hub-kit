@@ -45,6 +45,47 @@ describe('openapi', () => {
       expect(doc.servers).toEqual(servers);
     });
 
+    it('should support server variables', () => {
+      const servers = [
+        {
+          url: '{protocol}://{host}/api',
+          description: 'QOPS Hub Identity API',
+          variables: {
+            protocol: {
+              default: 'https',
+              enum: ['http', 'https'],
+              description: 'The protocol to use',
+            },
+            host: {
+              default: 'your-function-app.azurewebsites.net',
+              description: 'The hostname of your Azure Function App',
+            },
+          },
+        },
+      ];
+
+      const builder = new OpenApiBuilder({
+        title: 'QOPS Hub Identity API',
+        version: '1.0.0',
+        description: 'Authentication and user management for QOPS Hub',
+        servers,
+      });
+
+      const doc = builder.generateDocument();
+
+      expect(doc.servers).toEqual(servers);
+      expect(doc.servers[0].variables).toBeDefined();
+      expect(doc.servers[0].variables?.protocol).toEqual({
+        default: 'https',
+        enum: ['http', 'https'],
+        description: 'The protocol to use',
+      });
+      expect(doc.servers[0].variables?.host).toEqual({
+        default: 'your-function-app.azurewebsites.net',
+        description: 'The hostname of your Azure Function App',
+      });
+    });
+
     it('should register route with request body', () => {
       const builder = new OpenApiBuilder({
         title: 'Test API',

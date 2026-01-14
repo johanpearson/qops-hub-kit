@@ -11,12 +11,12 @@ parameters:
     type: string
     default: '22.x'
     displayName: 'Node.js version'
-  
+
   - name: workingDirectory
     type: string
     default: ''
     displayName: 'Working directory (optional)'
-  
+
   - name: useNpmrc
     type: boolean
     default: true
@@ -29,17 +29,17 @@ steps:
       versionSpec: ${{ parameters.nodeVersion }}
 
   - ${{ if eq(parameters.useNpmrc, true) }}:
-    - task: npmAuthenticate@0
-      displayName: 'Authenticate with Azure Artifacts'
-      inputs:
-        workingFile: ${{ parameters.workingDirectory }}/.npmrc
-      condition: and(succeeded(), ne('${{ parameters.workingDirectory }}', ''))
+      - task: npmAuthenticate@0
+        displayName: 'Authenticate with Azure Artifacts'
+        inputs:
+          workingFile: ${{ parameters.workingDirectory }}/.npmrc
+        condition: and(succeeded(), ne('${{ parameters.workingDirectory }}', ''))
 
-    - task: npmAuthenticate@0
-      displayName: 'Authenticate with Azure Artifacts'
-      inputs:
-        workingFile: .npmrc
-      condition: and(succeeded(), eq('${{ parameters.workingDirectory }}', ''))
+      - task: npmAuthenticate@0
+        displayName: 'Authenticate with Azure Artifacts'
+        inputs:
+          workingFile: .npmrc
+        condition: and(succeeded(), eq('${{ parameters.workingDirectory }}', ''))
 
   - script: npm ci
     displayName: 'Install dependencies (npm ci)'

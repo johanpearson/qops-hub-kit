@@ -5,21 +5,21 @@ parameters:
   - name: azureSubscription
     type: string
     displayName: 'Azure service connection (required)'
-  
+
   - name: functionAppName
     type: string
     displayName: 'Function App name (required)'
-  
+
   - name: package
     type: string
     default: '$(System.DefaultWorkingDirectory)/**/*.zip'
     displayName: 'Package to deploy'
-  
+
   - name: workingDirectory
     type: string
     default: ''
     displayName: 'Working directory for package creation'
-  
+
   - name: startupCommand
     type: string
     default: ''
@@ -28,14 +28,14 @@ parameters:
 steps:
   # Create deployment package if working directory is specified
   - ${{ if ne(parameters.workingDirectory, '') }}:
-    - task: ArchiveFiles@2
-      displayName: 'Create deployment package'
-      inputs:
-        rootFolderOrFile: '${{ parameters.workingDirectory }}'
-        includeRootFolder: false
-        archiveType: 'zip'
-        archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
-        replaceExistingArchive: true
+      - task: ArchiveFiles@2
+        displayName: 'Create deployment package'
+        inputs:
+          rootFolderOrFile: '${{ parameters.workingDirectory }}'
+          includeRootFolder: false
+          archiveType: 'zip'
+          archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+          replaceExistingArchive: true
 
   # Deploy to Azure Function App
   - task: AzureFunctionApp@2

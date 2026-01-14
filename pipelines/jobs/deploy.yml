@@ -5,30 +5,30 @@ parameters:
   - name: environment
     type: string
     displayName: 'Environment (dev/test/prod)'
-  
+
   - name: azureSubscription
     type: string
     displayName: 'Azure service connection'
-  
+
   - name: functionAppName
     type: string
     displayName: 'Function App name'
-  
+
   - name: vmImage
     type: string
     default: 'ubuntu-latest'
     displayName: 'VM image for deployment agent'
-  
+
   - name: dependsOn
     type: object
     default: []
     displayName: 'Job dependencies'
-  
+
   - name: workingDirectory
     type: string
     default: ''
     displayName: 'Working directory (optional)'
-  
+
   - name: jobName
     type: string
     default: 'Deploy'
@@ -41,7 +41,7 @@ jobs:
     pool:
       vmImage: ${{ parameters.vmImage }}
     dependsOn: ${{ parameters.dependsOn }}
-    
+
     strategy:
       runOnce:
         deploy:

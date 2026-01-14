@@ -6,32 +6,32 @@ parameters:
     type: string
     default: '22.x'
     displayName: 'Node.js version'
-  
+
   - name: workingDirectory
     type: string
     default: ''
     displayName: 'Working directory (optional)'
-  
+
   - name: stageName
     type: string
     default: 'CI'
     displayName: 'Stage name'
-  
+
   - name: displayName
     type: string
     default: 'Build and Test'
     displayName: 'Stage display name'
-  
+
   - name: vmImage
     type: string
     default: 'ubuntu-latest'
     displayName: 'VM image for build agent'
-  
+
   - name: runAutomatedTests
     type: boolean
     default: false
     displayName: 'Run automated tests'
-  
+
   - name: testRepoUrl
     type: string
     default: ''

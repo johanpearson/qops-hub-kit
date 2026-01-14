@@ -9,6 +9,7 @@ The common resources pipeline (`azure-pipelines-common-resources.yml`) requires 
 ## Why Variable Groups?
 
 Variable groups in Azure DevOps allow you to:
+
 - Store sensitive values securely
 - Share variables across multiple pipelines
 - Manage secrets separately from code
@@ -25,6 +26,7 @@ You need to create **three variable groups**, one for each environment:
 **Purpose:** Stores secrets for the DEV environment
 
 **Variables:**
+
 - `JWT_SECRET_DEV` (secret) - JWT secret for dev environment
   - Example value: A randomly generated string (min 32 characters)
   - Generate with: `openssl rand -base64 32`
@@ -34,6 +36,7 @@ You need to create **three variable groups**, one for each environment:
 **Purpose:** Stores secrets for the TEST environment
 
 **Variables:**
+
 - `JWT_SECRET_TEST` (secret) - JWT secret for test environment
   - Use a different secret than dev
   - Generate with: `openssl rand -base64 32`
@@ -43,6 +46,7 @@ You need to create **three variable groups**, one for each environment:
 **Purpose:** Stores secrets for the PROD environment
 
 **Variables:**
+
 - `JWT_SECRET_PROD` (secret) - JWT secret for prod environment
   - Use a different secret than dev and test
   - Generate with: `openssl rand -base64 32`
@@ -68,6 +72,7 @@ You need to create **three variable groups**, one for each environment:
 ### Step 3: Create TEST Variable Group
 
 Repeat step 2 with:
+
 - **Variable group name:** `qops-common-secrets-test`
 - **Variable name:** `JWT_SECRET_TEST`
 - **Value:** Different secret than dev
@@ -75,6 +80,7 @@ Repeat step 2 with:
 ### Step 4: Create PROD Variable Group
 
 Repeat step 2 with:
+
 - **Variable group name:** `qops-common-secrets-prod`
 - **Variable name:** `JWT_SECRET_PROD`
 - **Value:** Different secret than dev and test
@@ -82,6 +88,7 @@ Repeat step 2 with:
 ### Step 5: Set Permissions (Optional)
 
 For each variable group:
+
 1. Click the variable group name
 2. Click **Security**
 3. Add appropriate users/groups with permissions
@@ -103,16 +110,19 @@ variables:
 To generate secure random secrets, use one of these methods:
 
 ### Using OpenSSL (Linux/Mac/WSL)
+
 ```bash
 openssl rand -base64 32
 ```
 
 ### Using PowerShell (Windows)
+
 ```powershell
 [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
 ```
 
 ### Using Node.js
+
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
@@ -141,14 +151,17 @@ Once variable groups are created:
 ## Troubleshooting
 
 ### "Variable group not found"
+
 - Ensure variable group names match exactly (case-sensitive)
 - Check that variable groups are created in the same Azure DevOps project
 
 ### "Variable not found in group"
+
 - Ensure variable names match exactly: `JWT_SECRET_DEV`, `JWT_SECRET_TEST`, `JWT_SECRET_PROD`
 - Check that variables are added to the correct groups
 
 ### "Permission denied"
+
 - Ensure the pipeline has permission to access the variable groups
 - Go to Variable Group → Security → Add pipeline access
 

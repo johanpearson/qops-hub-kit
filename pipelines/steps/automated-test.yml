@@ -5,27 +5,27 @@ parameters:
   - name: testRepoUrl
     type: string
     displayName: 'Test repository URL (required)'
-  
+
   - name: testRepoBranch
     type: string
     default: 'main'
     displayName: 'Test repository branch'
-  
+
   - name: testScript
     type: string
     default: 'npm test'
     displayName: 'Test script to run'
-  
+
   - name: workingDirectory
     type: string
     default: 'automated-tests'
     displayName: 'Directory to clone tests into'
-  
+
   - name: nodeVersion
     type: string
     default: '22.x'
     displayName: 'Node.js version for test execution'
-  
+
   - name: publishResults
     type: boolean
     default: true
@@ -57,13 +57,13 @@ steps:
       API_KEY: $(API_KEY)
 
   - ${{ if eq(parameters.publishResults, true) }}:
-    - task: PublishTestResults@2
-      displayName: 'Publish automated test results'
-      condition: succeededOrFailed()
-      inputs:
-        testResultsFormat: 'JUnit'
-        testResultsFiles: '**/junit.xml'
-        searchFolder: ${{ parameters.workingDirectory }}
-        failTaskOnFailedTests: true
-        testRunTitle: 'Automated Tests'
-        mergeTestResults: true
+      - task: PublishTestResults@2
+        displayName: 'Publish automated test results'
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '**/junit.xml'
+          searchFolder: ${{ parameters.workingDirectory }}
+          failTaskOnFailedTests: true
+          testRunTitle: 'Automated Tests'
+          mergeTestResults: true

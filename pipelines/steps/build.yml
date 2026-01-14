@@ -6,7 +6,7 @@ parameters:
     type: string
     default: ''
     displayName: 'Working directory (optional)'
-  
+
   - name: buildScript
     type: string
     default: 'npm run build'

@@ -5,16 +5,19 @@ Reusable Azure DevOps pipeline templates for building and deploying Function App
 ## Available Templates
 
 ### Step Templates (`steps/`)
+
 - `prepare-node.yml` - Install Node.js 22, auth with npmrc, run npm ci
 - `build.yml` - Build TypeScript code
 - `unit-test.yml` - Run tests with coverage
 - `deploy-function-app.yml` - Deploy to Azure Function App
 
 ### Job Templates (`jobs/`)
+
 - `build-and-test.yml` - Complete build and test job
 - `deploy.yml` - Deployment job
 
 ### Stage Templates (`stages/`)
+
 - `ci.yml` - CI stage
 - `deploy-environment.yml` - Deploy to environment
 

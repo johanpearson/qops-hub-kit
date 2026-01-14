@@ -50,16 +50,15 @@ module keyVault 'modules/key-vault.bicep' = {
 }
 
 // Store JWT secret in Key Vault
-resource jwtSecretResource 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  name: '${keyVaultName}/jwt-secret'
-  properties: {
-    value: jwtSecret
-    contentType: 'text/plain'
-    attributes: {
-      enabled: true
-    }
-  }
+module jwtSecretResource 'modules/key-vault-secret.bicep' = {
+  name: 'deploy-jwt-secret'
   scope: resourceGroup(resourceGroupName)
+  params: {
+    keyVaultName: keyVaultName
+    secretName: 'jwt-secret'
+    secretValue: jwtSecret
+    contentType: 'text/plain'
+  }
   dependsOn: [
     keyVault
   ]

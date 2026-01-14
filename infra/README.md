@@ -29,15 +29,15 @@ az deployment sub create \
 ## What Gets Deployed
 
 ### Common Resources
-- Resource Group: `rg-qops-common-{env}-swedencentral`
-- Key Vault for JWT secrets
+- Resource Group: `rg-qops-common-{env}`
+- Key Vault: `kv-qops-{env}`
 - **Tags**: Environment, Project: QOPS, Owner: Johan Pearson, ManagedBy: IaC
 
 ### Service Resources
-- Resource Group: `rg-qops-{service}-{env}-swedencentral`
-- Function App (Consumption plan Y1)
-- Storage Account (blob + table, Standard_LRS)
-- Application Insights
+- Resource Group: `rg-qops-{service}-{env}`
+- Function App: `func-qops-{service}-{env}`
+- Storage Account: `stqops{service}{env}`
+- Application Insights: `appi-qops-{service}-{env}`
 - **Tags**: Environment, Service, Project: QOPS, Owner: Johan Pearson, ManagedBy: IaC
 
 ## Cost
@@ -48,3 +48,11 @@ All resources use cheapest SKUs:
 - App Insights: Pay-as-you-go (~$0-5/month)
 
 **Total: ~$5-20/month per service**
+
+## Naming Considerations
+
+Resource names follow a simplified pattern without location suffixes or random hashes:
+- **Resource Groups**: Subscription-scoped, no global uniqueness required
+- **Key Vault & Storage Accounts**: Globally unique across Azure - if a name conflict occurs, you may need to add a suffix
+
+If you encounter naming conflicts, you can add uniqueness by modifying the Bicep variables to include a suffix like `${take(uniqueString(subscription().subscriptionId), 6)}`.

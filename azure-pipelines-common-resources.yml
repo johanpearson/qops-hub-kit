@@ -12,12 +12,12 @@ parameters:
     displayName: 'Deploy to DEV'
     type: boolean
     default: true
-  
+
   - name: deployToTest
     displayName: 'Deploy to TEST'
     type: boolean
     default: false
-  
+
   - name: deployToProd
     displayName: 'Deploy to PROD'
     type: boolean
@@ -28,7 +28,7 @@ variables:
     value: 'swedencentral'
   - name: azureSubscription
     value: 'Azure-Connection' # Update with your Azure DevOps service connection name
-  
+
   # Link to variable groups containing secrets
   - group: qops-common-secrets-dev
   - group: qops-common-secrets-test
@@ -56,9 +56,9 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 echo "Deploying common resources to DEV environment"
-                
+
                 DEPLOYMENT_NAME="common-dev-$(Build.BuildId)"
-                
+
                 az deployment sub create \
                   --name $DEPLOYMENT_NAME \
                   --location $(location) \
@@ -66,20 +66,20 @@ stages:
                   --parameters environment=dev \
                   --parameters location=$(location) \
                   --parameters jwtSecret="$(JWT_SECRET_DEV)"
-                
+
                 echo ""
                 echo "✅ Common resources deployed to DEV!"
                 echo ""
-                
+
                 # Get deployment outputs
                 KEY_VAULT_NAME=$(az deployment sub show \
                   --name $DEPLOYMENT_NAME \
                   --query properties.outputs.keyVaultName.value -o tsv)
-                
+
                 KEY_VAULT_URI=$(az deployment sub show \
                   --name $DEPLOYMENT_NAME \
                   --query properties.outputs.keyVaultUri.value -o tsv)
-                
+
                 echo "Key Vault Name: $KEY_VAULT_NAME"
                 echo "Key Vault URI: $KEY_VAULT_URI"
                 echo ""
@@ -111,9 +111,9 @@ stages:
                     scriptLocation: 'inlineScript'
                     inlineScript: |
                       echo "Deploying common resources to TEST environment"
-                      
+
                       DEPLOYMENT_NAME="common-test-$(Build.BuildId)"
-                      
+
                       az deployment sub create \
                         --name $DEPLOYMENT_NAME \
                         --location $(location) \
@@ -121,20 +121,20 @@ stages:
                         --parameters environment=test \
                         --parameters location=$(location) \
                         --parameters jwtSecret="$(JWT_SECRET_TEST)"
-                      
+
                       echo ""
                       echo "✅ Common resources deployed to TEST!"
                       echo ""
-                      
+
                       # Get deployment outputs
                       KEY_VAULT_NAME=$(az deployment sub show \
                         --name $DEPLOYMENT_NAME \
                         --query properties.outputs.keyVaultName.value -o tsv)
-                      
+
                       KEY_VAULT_URI=$(az deployment sub show \
                         --name $DEPLOYMENT_NAME \
                         --query properties.outputs.keyVaultUri.value -o tsv)
-                      
+
                       echo "Key Vault Name: $KEY_VAULT_NAME"
                       echo "Key Vault URI: $KEY_VAULT_URI"
 
@@ -164,9 +164,9 @@ stages:
                     scriptLocation: 'inlineScript'
                     inlineScript: |
                       echo "Deploying common resources to PROD environment"
-                      
+
                       DEPLOYMENT_NAME="common-prod-$(Build.BuildId)"
-                      
+
                       az deployment sub create \
                         --name $DEPLOYMENT_NAME \
                         --location $(location) \
@@ -174,19 +174,19 @@ stages:
                         --parameters environment=prod \
                         --parameters location=$(location) \
                         --parameters jwtSecret="$(JWT_SECRET_PROD)"
-                      
+
                       echo ""
                       echo "✅ Common resources deployed to PROD!"
                       echo ""
-                      
+
                       # Get deployment outputs
                       KEY_VAULT_NAME=$(az deployment sub show \
                         --name $DEPLOYMENT_NAME \
                         --query properties.outputs.keyVaultName.value -o tsv)
-                      
+
                       KEY_VAULT_URI=$(az deployment sub show \
                         --name $DEPLOYMENT_NAME \
                         --query properties.outputs.keyVaultUri.value -o tsv)
-                      
+
                       echo "Key Vault Name: $KEY_VAULT_NAME"
                       echo "Key Vault URI: $KEY_VAULT_URI"

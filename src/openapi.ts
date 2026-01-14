@@ -78,6 +78,50 @@ export interface RouteDefinition {
 }
 
 /**
+ * Server variable configuration for OpenAPI
+ */
+export interface ServerVariable {
+  /**
+   * Default value for the variable
+   */
+  default: string | boolean | number;
+  /**
+   * Enumeration of allowed values
+   */
+  enum?: string[] | boolean[] | number[];
+  /**
+   * Description of the variable
+   */
+  description?: string;
+  /**
+   * Allow extension properties (x-*)
+   */
+  [key: `x-${string}`]: any;
+}
+
+/**
+ * Server configuration for OpenAPI
+ */
+export interface ServerConfig {
+  /**
+   * Server URL (may contain variables in curly braces, e.g., {protocol}://{host})
+   */
+  url: string;
+  /**
+   * Server description
+   */
+  description?: string;
+  /**
+   * Variables for server URL templating
+   */
+  variables?: Record<string, ServerVariable>;
+  /**
+   * Allow extension properties (x-*)
+   */
+  [key: `x-${string}`]: any;
+}
+
+/**
  * OpenAPI configuration
  */
 export interface OpenApiConfig {
@@ -96,7 +140,7 @@ export interface OpenApiConfig {
   /**
    * Server URLs
    */
-  servers?: Array<{ url: string; description?: string }>;
+  servers?: ServerConfig[];
 }
 
 /**

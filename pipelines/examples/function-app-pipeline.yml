@@ -28,7 +28,7 @@ variables:
     value: 'Azure-Connection' # Your Azure DevOps service connection
   - name: location
     value: 'swedencentral'
-  
+
   # Variable groups for secrets (see VARIABLE-GROUPS.md for setup)
   - group: qops-common-secrets-dev
   - group: qops-common-secrets-test
@@ -51,7 +51,7 @@ stages:
         displayName: 'Build and Test'
         pool:
           vmImage: 'ubuntu-latest'
-        
+
         steps:
           # Prepare Node.js
           - template: pipelines/steps/prepare-node.yml@hubkit
@@ -113,9 +113,9 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 echo "Deploying $(serviceName) infrastructure to dev"
-                
+
                 DEPLOYMENT_NAME="$(serviceName)-dev-$(Build.BuildId)"
-                
+
                 # Deploy infrastructure and capture outputs
                 az deployment sub create \
                   --name $DEPLOYMENT_NAME \
@@ -125,12 +125,12 @@ stages:
                   --parameters serviceName=$(serviceName) \
                   --parameters location=$(location) \
                   --parameters jwtSecret="$(JWT_SECRET_DEV)"
-                
+
                 # Get Function App name from deployment output
                 FUNCTION_APP_NAME=$(az deployment sub show \
                   --name $DEPLOYMENT_NAME \
                   --query properties.outputs.functionAppName.value -o tsv)
-                
+
                 echo "Function App Name: $FUNCTION_APP_NAME"
                 echo "##vso[task.setvariable variable=functionAppName;isOutput=true]$FUNCTION_APP_NAME"
 
@@ -177,9 +177,9 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 echo "Deploying $(serviceName) infrastructure to test"
-                
+
                 DEPLOYMENT_NAME="$(serviceName)-test-$(Build.BuildId)"
-                
+
                 az deployment sub create \
                   --name $DEPLOYMENT_NAME \
                   --location $(location) \
@@ -188,11 +188,11 @@ stages:
                   --parameters serviceName=$(serviceName) \
                   --parameters location=$(location) \
                   --parameters jwtSecret="$(JWT_SECRET_TEST)"
-                
+
                 FUNCTION_APP_NAME=$(az deployment sub show \
                   --name $DEPLOYMENT_NAME \
                   --query properties.outputs.functionAppName.value -o tsv)
-                
+
                 echo "##vso[task.setvariable variable=functionAppName;isOutput=true]$FUNCTION_APP_NAME"
 
       # Deploy application
@@ -238,9 +238,9 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 echo "Deploying $(serviceName) infrastructure to prod"
-                
+
                 DEPLOYMENT_NAME="$(serviceName)-prod-$(Build.BuildId)"
-                
+
                 az deployment sub create \
                   --name $DEPLOYMENT_NAME \
                   --location $(location) \
@@ -249,11 +249,11 @@ stages:
                   --parameters serviceName=$(serviceName) \
                   --parameters location=$(location) \
                   --parameters jwtSecret="$(JWT_SECRET_PROD)"
-                
+
                 FUNCTION_APP_NAME=$(az deployment sub show \
                   --name $DEPLOYMENT_NAME \
                   --query properties.outputs.functionAppName.value -o tsv)
-                
+
                 echo "##vso[task.setvariable variable=functionAppName;isOutput=true]$FUNCTION_APP_NAME"
 
       # Deploy application

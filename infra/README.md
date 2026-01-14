@@ -48,3 +48,11 @@ All resources use cheapest SKUs:
 - App Insights: Pay-as-you-go (~$0-5/month)
 
 **Total: ~$5-20/month per service**
+
+## Naming Considerations
+
+Resource names follow a simplified pattern without location suffixes or random hashes:
+- **Resource Groups**: Subscription-scoped, no global uniqueness required
+- **Key Vault & Storage Accounts**: Globally unique across Azure - if a name conflict occurs, you may need to add a suffix
+
+If you encounter naming conflicts, you can add uniqueness by modifying the Bicep variables to include a suffix like `${take(uniqueString(subscription().subscriptionId), 6)}`.

@@ -18,6 +18,8 @@ param tags object = {}
 
 // Variables
 var resourceGroupName = 'rg-qops-common-${environment}'
+// Note: Key Vault names must be globally unique across Azure. If this name is already taken,
+// consider adding a suffix like: 'kv-qops-${environment}-${uniqueString(subscription().subscriptionId)}'
 var keyVaultName = 'kv-qops-${environment}'
 
 // Create common resource group

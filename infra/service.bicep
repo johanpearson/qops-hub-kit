@@ -34,6 +34,9 @@ param tags object = {}
 // Variables
 var resourceGroupName = 'rg-qops-${serviceName}-${environment}'
 var functionAppName = 'func-qops-${serviceName}-${environment}'
+// Note: Storage account names must be globally unique across Azure (3-24 chars, lowercase/numbers only).
+// If this name is already taken, consider adding a suffix like: 
+// 'stqops${serviceName}${environment}${take(uniqueString(subscription().subscriptionId), 6)}'
 var storageAccountName = 'stqops${serviceName}${environment}'
 var appInsightsName = 'appi-qops-${serviceName}-${environment}'
 var skuTier = 'Dynamic' // Consumption plan

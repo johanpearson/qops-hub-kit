@@ -29,15 +29,15 @@ az deployment sub create \
 ## What Gets Deployed
 
 ### Common Resources
-- Resource Group: `rg-qops-common-{env}-swedencentral`
-- Key Vault for JWT secrets
+- Resource Group: `rg-qops-common-{env}`
+- Key Vault: `kv-qops-{env}`
 - **Tags**: Environment, Project: QOPS, Owner: Johan Pearson, ManagedBy: IaC
 
 ### Service Resources
-- Resource Group: `rg-qops-{service}-{env}-swedencentral`
-- Function App (Consumption plan Y1)
-- Storage Account (blob + table, Standard_LRS)
-- Application Insights
+- Resource Group: `rg-qops-{service}-{env}`
+- Function App: `func-qops-{service}-{env}`
+- Storage Account: `stqops{service}{env}`
+- Application Insights: `appi-qops-{service}-{env}`
 - **Tags**: Environment, Service, Project: QOPS, Owner: Johan Pearson, ManagedBy: IaC
 
 ## Cost

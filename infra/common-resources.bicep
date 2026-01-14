@@ -17,8 +17,8 @@ param jwtSecret string
 param tags object = {}
 
 // Variables
-var resourceGroupName = 'rg-qops-common-${environment}-${location}'
-var keyVaultName = 'kv-qops-${environment}-${uniqueString(subscription().subscriptionId, environment)}'
+var resourceGroupName = 'rg-qops-common-${environment}'
+var keyVaultName = 'kv-qops-${environment}'
 
 // Create common resource group
 module commonResourceGroup 'modules/resource-group.bicep' = {

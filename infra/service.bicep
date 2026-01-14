@@ -32,9 +32,9 @@ param additionalAppSettings array = []
 param tags object = {}
 
 // Variables
-var resourceGroupName = 'rg-qops-${serviceName}-${environment}-${location}'
-var functionAppName = 'func-qops-${serviceName}-${environment}-${uniqueString(subscription().subscriptionId, serviceName, environment)}'
-var storageAccountName = 'stqops${serviceName}${environment}${uniqueString(subscription().subscriptionId, serviceName, environment)}'
+var resourceGroupName = 'rg-qops-${serviceName}-${environment}'
+var functionAppName = 'func-qops-${serviceName}-${environment}'
+var storageAccountName = 'stqops${serviceName}${environment}'
 var appInsightsName = 'appi-qops-${serviceName}-${environment}'
 var skuTier = 'Dynamic' // Consumption plan
 

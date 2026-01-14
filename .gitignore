@@ -8,3 +8,7 @@ coverage/
 .eslintcache
 junit.xml
 README.md.backup
+
+# Bicep compiled ARM templates (exclude from version control)
+infra/*.json
+!infra/parameters/*.json

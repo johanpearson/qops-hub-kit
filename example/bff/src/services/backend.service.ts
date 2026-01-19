@@ -62,7 +62,7 @@ export async function getUserOrders(userId: string, context: InvocationContext, 
     {
       id: 'order-2',
       userId,
-      status: 'processing' as const,
+      status: 'pending' as const,
       total: 149.99,
       items: [
         {

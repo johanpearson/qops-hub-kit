@@ -23,7 +23,7 @@ const handler = createHandler(
     // Calculate statistics
     const stats = {
       totalOrders: allOrders.length,
-      pendingOrders: allOrders.filter((o) => o.status === 'processing').length,
+      pendingOrders: allOrders.filter((o) => o.status === 'pending').length,
       completedOrders: allOrders.filter((o) => o.status === 'completed').length,
       unreadNotifications: allNotifications.filter((n) => !n.read).length,
     };

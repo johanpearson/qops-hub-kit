@@ -382,15 +382,144 @@ context.log(`User profile fetch completed in ${duration}ms`);
 
 ### 6. Add Service-to-Service Authentication
 
-Use managed identities or service principals for backend calls:
+For production deployments, backend services (identity, profile, calendar, documents) should be secured at the function level. Here are two recommended approaches:
+
+#### Option A: Managed Identity (Recommended for Azure)
+
+Use Azure Managed Identity for passwordless authentication between BFF and backend services:
+
+**1. Enable System-Assigned Managed Identity on BFF Function App:**
+
+```bash
+az functionapp identity assign --name bff-app --resource-group myResourceGroup
+```
+
+**2. Configure Backend Services with Function-Level Auth:**
+
+Set `authLevel: 'function'` in backend services and use App Service Authentication:
 
 ```typescript
-const token = await getServiceToken();
-const response = await fetch(url, {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
+// Backend service (e.g., profile-service)
+app.http('getProfile', {
+  methods: ['GET'],
+  authLevel: 'function', // Requires function key or managed identity token
+  route: 'users/{userId}',
+  handler: profileHandler,
 });
+```
+
+**3. Grant BFF Managed Identity Access to Backend Services:**
+
+```bash
+# Get BFF's managed identity
+bffIdentity=$(az functionapp identity show --name bff-app --resource-group myResourceGroup --query principalId -o tsv)
+
+# Assign role to access backend service
+az role assignment create \
+  --role "Website Contributor" \
+  --assignee $bffIdentity \
+  --scope /subscriptions/{subscription-id}/resourceGroups/myResourceGroup/providers/Microsoft.Web/sites/profile-service
+```
+
+**4. Use DefaultAzureCredential in BFF to call backend services:**
+
+```typescript
+import { DefaultAzureCredential } from '@azure/identity';
+
+async function getBackendToken(): Promise<string> {
+  const credential = new DefaultAzureCredential();
+  const tokenResponse = await credential.getToken('https://management.azure.com/.default');
+  return tokenResponse.token;
+}
+
+export async function getUserProfile(userId: string, context: InvocationContext) {
+  const token = await getBackendToken();
+  const response = await fetch(`${process.env.PROFILE_SERVICE_URL}/users/${userId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'x-functions-key': process.env.PROFILE_SERVICE_KEY, // Alternative: Use function key
+    },
+  });
+
+  if (!response.ok) {
+    throw new AppError(ErrorCode.INTERNAL_ERROR, 'Failed to fetch user profile');
+  }
+
+  return response.json();
+}
+```
+
+#### Option B: Function Keys with Azure Key Vault
+
+Store function keys in Azure Key Vault and retrieve them at runtime:
+
+**1. Store Backend Service Keys in Key Vault:**
+
+```bash
+az keyvault secret set --vault-name myKeyVault --name profile-service-key --value {function-key}
+az keyvault secret set --vault-name myKeyVault --name calendar-service-key --value {function-key}
+az keyvault secret set --vault-name myKeyVault --name document-service-key --value {function-key}
+```
+
+**2. Grant BFF Access to Key Vault:**
+
+```bash
+az keyvault set-policy --name myKeyVault \
+  --object-id $bffIdentity \
+  --secret-permissions get list
+```
+
+**3. Retrieve Keys at Runtime:**
+
+```typescript
+import { SecretClient } from '@azure/keyvault-secrets';
+import { DefaultAzureCredential } from '@azure/identity';
+
+const keyVaultUrl = process.env.KEY_VAULT_URL!;
+const credential = new DefaultAzureCredential();
+const secretClient = new SecretClient(keyVaultUrl, credential);
+
+async function getServiceKey(serviceName: string): Promise<string> {
+  const secret = await secretClient.getSecret(`${serviceName}-service-key`);
+  return secret.value!;
+}
+
+export async function getUserProfile(userId: string, context: InvocationContext) {
+  const functionKey = await getServiceKey('profile');
+  const response = await fetch(`${process.env.PROFILE_SERVICE_URL}/users/${userId}`, {
+    headers: {
+      'x-functions-key': functionKey,
+    },
+  });
+
+  return response.json();
+}
+```
+
+#### Security Best Practices
+
+1. **Lock Down Backend Services**: Set `authLevel: 'function'` on all backend services to require authentication
+2. **Use Managed Identity**: Prefer managed identity over API keys to avoid credential management
+3. **Network Isolation**: Use VNet integration and private endpoints for service-to-service communication
+4. **Validate JWT Claims**: In backend services, validate that the `sub` (userId) from JWT matches the requested resource
+5. **Role-Based Access**: Use the `role` claim (admin/member) for authorization in both BFF and backend services
+6. **Audit Logging**: Log all service-to-service calls for security auditing
+
+#### Example Architecture
+
+```
+Frontend (React/Angular)
+    ↓ [JWT from Identity Service]
+BFF (Azure Function)
+    ├→ Identity Service [Managed Identity] → Issues JWTs, validates users
+    ├→ Profile Service [Managed Identity] → User profiles (Table Storage)
+    ├→ Calendar Service [Managed Identity] → TimeOff, TeamEvents (Table Storage)
+    └→ Document Service [Managed Identity] → File upload/download (Blob Storage)
+
+All backend services:
+- authLevel: 'function' (requires authentication)
+- Validate JWT sub (userId) matches resource owner
+- Enforce role-based access (admin/member)
 ```
 
 ### 7. Add Request Validation

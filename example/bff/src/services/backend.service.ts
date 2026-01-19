@@ -3,6 +3,11 @@ import type { InvocationContext } from '@azure/functions';
 /**
  * User service - simulates calling a separate Azure Function
  * In production, this would make HTTP calls to the actual user service
+ *
+ * PRODUCTION SECURITY:
+ * - Backend service should use authLevel: 'function' to require authentication
+ * - Use Managed Identity or function keys stored in Azure Key Vault
+ * - Validate JWT claims (sub, role) in backend service
  */
 export async function getUserProfile(userId: string, context: InvocationContext) {
   context.log(`[UserService] Fetching profile for user: ${userId}`);
@@ -10,9 +15,16 @@ export async function getUserProfile(userId: string, context: InvocationContext)
   // Simulate API call delay
   await new Promise((resolve) => setTimeout(resolve, 100));
 
-  // In production:
+  // In production with Managed Identity:
+  // import { DefaultAzureCredential } from '@azure/identity';
+  // const credential = new DefaultAzureCredential();
+  // const token = await credential.getToken('https://management.azure.com/.default');
+  //
   // const response = await fetch(`${process.env.USER_SERVICE_URL}/users/${userId}`, {
-  //   headers: { 'Authorization': `Bearer ${token}` }
+  //   headers: {
+  //     'Authorization': `Bearer ${token}`,
+  //     'x-functions-key': process.env.USER_SERVICE_KEY, // Alternative: function key
+  //   }
   // });
   // return response.json();
 

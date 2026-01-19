@@ -9,7 +9,8 @@ const builder = new OpenApiBuilder({
   title: 'BFF (Backend for Frontend) API',
   version: '1.0.0',
   description:
-    'Example BFF API that aggregates data from multiple backend services (User, Order, Notification) and provides optimized endpoints for frontend applications',
+    'Example BFF API that aggregates data from multiple backend services ' +
+    '(User, Order, Notification) and provides optimized endpoints for frontend applications',
   servers: [
     {
       url: 'http://localhost:7071/api',
@@ -18,13 +19,7 @@ const builder = new OpenApiBuilder({
   ],
 });
 
-// Add JWT security scheme
-builder.addSecurityScheme('bearerAuth', {
-  type: 'http',
-  scheme: 'bearer',
-  bearerFormat: 'JWT',
-  description: 'JWT token from authentication service',
-});
+// Security scheme is automatically registered by OpenApiBuilder
 
 // Register health check endpoint
 builder.registerRoute({
@@ -46,7 +41,8 @@ builder.registerRoute({
   path: '/profile',
   summary: 'Get aggregated user profile',
   description:
-    'Fetches and combines user profile data from multiple backend services: user profile, recent orders, and unread notifications',
+    'Fetches and combines user profile data from multiple backend services: ' +
+    'user profile, recent orders, and unread notifications',
   tags: ['User'],
   responses: {
     200: {
@@ -69,7 +65,8 @@ builder.registerRoute({
   path: '/dashboard',
   summary: 'Get dashboard data',
   description:
-    'Fetches aggregated data from multiple backend services and transforms it for the dashboard UI. Includes user info, statistics, and recent activity',
+    'Fetches aggregated data from multiple backend services and transforms it for the dashboard UI. ' +
+    'Includes user info, statistics, and recent activity',
   tags: ['Dashboard'],
   responses: {
     200: {

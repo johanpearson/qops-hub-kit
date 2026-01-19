@@ -9,7 +9,8 @@ import { getUserProfile, getUserOrders, getUserNotifications } from '../services
  */
 const handler = createHandler(
   async (request, context, { user }) => {
-    const userId = user.sub;
+    // With jwtConfig and requiredRoles, user and user.sub are guaranteed to be present
+    const userId = user!.sub!;
     context.log(`Fetching dashboard data for user: ${userId}`);
 
     // Fetch data from multiple backend services in parallel
@@ -22,7 +23,7 @@ const handler = createHandler(
     // Calculate statistics
     const stats = {
       totalOrders: allOrders.length,
-      pendingOrders: allOrders.filter((o) => o.status === 'pending').length,
+      pendingOrders: allOrders.filter((o) => o.status === 'processing').length,
       completedOrders: allOrders.filter((o) => o.status === 'completed').length,
       unreadNotifications: allNotifications.filter((n) => !n.read).length,
     };

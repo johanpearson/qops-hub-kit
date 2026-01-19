@@ -11,7 +11,8 @@ import { getUserProfile, getUserOrders, getUserNotifications } from '../services
  */
 const handler = createHandler(
   async (request, context, { user }) => {
-    const userId = user.sub;
+    // With jwtConfig and requiredRoles, user and user.sub are guaranteed to be present
+    const userId = user!.sub!;
     context.log(`Fetching aggregated profile for user: ${userId}`);
 
     // Call multiple backend services in parallel for better performance

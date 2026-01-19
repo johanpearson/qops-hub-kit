@@ -1,0 +1,23 @@
+{
+  "name": "bff-example",
+  "version": "1.0.0",
+  "description": "Example BFF (Backend for Frontend) Azure Functions app demonstrating API aggregation with @qops/hub-kit",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "func start",
+    "generate-token": "node generate-token.mjs"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.11.0",
+    "@qops/hub-kit": "file:../..",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "typescript": "^5.9.3"
+  }
+}

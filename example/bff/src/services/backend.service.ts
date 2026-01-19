@@ -88,9 +88,10 @@ export async function getUserNotifications(userId: string, context: InvocationCo
   await new Promise((resolve) => setTimeout(resolve, 120));
 
   // In production:
-  // const response = await fetch(`${process.env.NOTIFICATION_SERVICE_URL}/notifications?userId=${userId}&unreadOnly=${unreadOnly}`, {
-  //   headers: { 'Authorization': `Bearer ${token}` }
-  // });
+  // const response = await fetch(
+  //   `${process.env.NOTIFICATION_SERVICE_URL}/notifications?userId=${userId}&unreadOnly=${unreadOnly}`,
+  //   { headers: { 'Authorization': `Bearer ${token}` } }
+  // );
   // return response.json();
 
   // Mock data for demonstration

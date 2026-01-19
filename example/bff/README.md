@@ -410,34 +410,47 @@ app.http('getProfile', {
 
 **3. Grant BFF Managed Identity Access to Backend Services:**
 
+For App Service Authentication/EasyAuth on backend services:
+
 ```bash
 # Get BFF's managed identity
 bffIdentity=$(az functionapp identity show --name bff-app --resource-group myResourceGroup --query principalId -o tsv)
 
-# Assign role to access backend service
+# Configure backend service to accept tokens from BFF
+az functionapp auth update --name profile-service --resource-group myResourceGroup \
+  --enabled true \
+  --action AllowAnonymous
+
+# Or use custom role with minimal permissions
 az role assignment create \
-  --role "Website Contributor" \
+  --role "Reader" \
   --assignee $bffIdentity \
   --scope /subscriptions/{subscription-id}/resourceGroups/myResourceGroup/providers/Microsoft.Web/sites/profile-service
 ```
 
-**4. Use DefaultAzureCredential in BFF to call backend services:**
+**4. Call backend services using Managed Identity:**
+
+For Azure Functions, use function keys with managed identity to retrieve them from Key Vault, or use App Service Authentication. Here's the recommended approach with function keys:
 
 ```typescript
 import { DefaultAzureCredential } from '@azure/identity';
+import { SecretClient } from '@azure/keyvault-secrets';
 
-async function getBackendToken(): Promise<string> {
+// Store function keys in Key Vault and retrieve them using managed identity
+async function getBackendFunctionKey(serviceName: string): Promise<string> {
   const credential = new DefaultAzureCredential();
-  const tokenResponse = await credential.getToken('https://management.azure.com/.default');
-  return tokenResponse.token;
+  const keyVaultUrl = process.env.KEY_VAULT_URL!;
+  const secretClient = new SecretClient(keyVaultUrl, credential);
+
+  const secret = await secretClient.getSecret(`${serviceName}-function-key`);
+  return secret.value!;
 }
 
 export async function getUserProfile(userId: string, context: InvocationContext) {
-  const token = await getBackendToken();
+  const functionKey = await getBackendFunctionKey('profile-service');
   const response = await fetch(`${process.env.PROFILE_SERVICE_URL}/users/${userId}`, {
     headers: {
-      Authorization: `Bearer ${token}`,
-      'x-functions-key': process.env.PROFILE_SERVICE_KEY, // Alternative: Use function key
+      'x-functions-key': functionKey,
     },
   });
 
@@ -491,6 +504,10 @@ export async function getUserProfile(userId: string, context: InvocationContext)
       'x-functions-key': functionKey,
     },
   });
+
+  if (!response.ok) {
+    throw new AppError(ErrorCode.INTERNAL_ERROR, 'Failed to fetch user profile');
+  }
 
   return response.json();
 }
